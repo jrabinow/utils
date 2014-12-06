@@ -349,10 +349,13 @@ typedef byte *bitset;
 
 /* obtain bit at position pos from set array */
 int getbit(bitset set, int pos);
+
 /* set bit at position pos to 1 */
 void setbit(bitset set, int pos);
+
 /* set bit at position pos to 0 */
 void unsetbit(bitset set, int pos);
+
 /* flip bit at position pos */
 int togglebit(bitset set, int pos);
 
@@ -437,8 +440,10 @@ void normal_getchar(void);
  * to tell if we should call pthread_detach on new thread or not.
  * Returns thread id variable */
 pthread_t launch_thread(void *(start_routine)(void*), void *arg, int detach);
+
 #ifdef ENABLE_ERROR_HANDLING
 pthread_t xlaunch_thread(void *(*start_routine)(void*), void *arg, int detach);
+
 void *xpthread_join(pthread_t thread);
 #endif /* #ifdef ENABLE_ERROR_HANDLING */
 
@@ -472,6 +477,9 @@ void mempool_delete(struct mempool *mp);
 
 /* -------------------- Misc functions -------------------- */
 #ifdef ENABLE_MISC
+
+#include <stdarg.h>
+#include <time.h>
 
 typedef enum {
 	Monday = 0,
@@ -512,8 +520,6 @@ void *initialize_vector(void *dest, const void *src, size_t size, size_t nmemb);
 void register_signal_handler(int signum, void (*sighandler)(int));
 #endif /* #ifdef __unix */
 
-#include <stdarg.h>
-#include <time.h>
 typedef enum {
 	LOG_DEBUG,
 	LOG_INFO,
