@@ -811,6 +811,7 @@ size_t split_str_lite(char *str, const char separator, char ***returnArray)
 
 /* -------------------- Reading data -------------------- */
 #ifdef ENABLE_READ_DATA
+
 char *read_line(FILE *stream)
 {
 	unsigned i = 0;
@@ -1030,6 +1031,7 @@ void *dirwalk(const char *path, void* (*func)(void*, char*), void *arg)
 }
 #endif /* #ifdef ENABLE_FILESYSTEM */
 
+
 /* -------------------- Terminal manipulation functions and color printing -------------------- */
 #if defined(ENABLE_TERMIOS_MANIPULATION) && defined(__unix)
 
@@ -1139,6 +1141,46 @@ void normal_getchar(void)
 
 #endif /* #if defined(ENABLE_TERMIOS_MANIPULATION) && defined(__unix) */
 
+
+/* -------------------- Threading -------------------- */
+#ifdef ENABLE_THREADING
+
+pthread_t launch_thread(void* (*start_routine)(void*), void *arg, int detach)
+{
+	pthread_t th;
+	if(pthread_create(&th, NULL, start_routine, arg) != 0) {
+		log_message(LOG_ERROR, "Error creating thread!\n");
+		th = 0;
+	} else if(detach && pthread_detach(th) != 0)
+		log_message(LOG_ERROR, "Error detaching thread\n");
+	return th;
+}
+
+#ifdef ENABLE_ERROR_HANDLING
+
+pthread_t xlaunch_thread(void *(*start_routine)(void*), void *arg, int detach)
+{
+	pthread_t th = launch_thread(start_routine, arg, detach);
+	if(th == 0) {
+		perror("Thread not created");
+		exit(EXIT_FAILURE);
+	}
+	return th;
+}
+
+void *xpthread_join(pthread_t thread)
+{
+	void *retval;
+
+	if(pthread_join(thread, &retval) != 0) {
+		perror("Error joining threads");
+		exit(EXIT_FAILURE);
+	}
+	return retval;
+}
+
+#endif /* #ifdef ENABLE_ERROR_HANDLING */
+#endif /* #ifdef ENABLE_THREADING */
 
 /* -------------------- Memory pool -------------------- */
 #ifdef ENABLE_MEMPOOL
@@ -1328,6 +1370,71 @@ void register_signal_handler(int signum, void (*sighandler)(int))
 		perror("Error registering signal handler ");
 		exit(EXIT_FAILURE);
 #endif /* #if ! defined(ENABLE_ERROR_HANDLING) || ! defined(INTERNAL_ERROR_HANDLING) */
+	}
+}
+
+/* From
+http://www.emoticode.net/c/an-example-log-function-using-different-log-levels-and-variadic-macros.html
+ */
+static log_level_t __g_loglevel = LOG_DEBUG;
+static FILE *__g_loghandle = NULL;
+
+void init_log(FILE *stream, log_level_t loglevel)
+{
+	__g_loglevel = loglevel;
+	__g_loghandle = stream;
+}
+
+void log_message(log_level_t level, const char *format, ...)
+{
+	char buffer[255] = { 0 }, timestamp[255] = { 0 }, *slevel;
+	va_list ap;
+	time_t rawtime;
+	struct tm *timeinfo;
+#if defined(ENABLE_TERMIOS_MANIPULATION) && defined(__unix)
+	Color color = WHITE, bgcolor = BLACK;
+#endif	/* #if defined(ENABLE_TERMIOS_MANIPULATION) && defined(__unix) */
+
+	if(level >= __g_loglevel) {
+		va_start(ap, format);
+		vsnprintf(buffer, 255, format, ap);
+		va_end(ap);
+		time(&rawtime);
+		timeinfo = localtime(&rawtime);
+		strftime(timestamp, 255, "%d/%m/%Y %X", timeinfo);
+
+		switch(level) {
+			case LOG_DEBUG:
+				slevel = "DEBUG";
+				break;
+			case LOG_INFO:
+				slevel = "INFO";
+				color = GREEN;
+				break;
+			case LOG_WARNING:
+				slevel = "WARNING";
+				color = YELLOW;
+				break;
+			case LOG_ERROR:
+				slevel = "ERROR";
+				color = RED;
+				break;
+			case LOG_FATAL:
+			default:
+				slevel = "FATAL";
+				bgcolor = RED;
+				break;
+		}
+#if defined(ENABLE_TERMIOS_MANIPULATION) && defined(__unix)
+		if(__g_loghandle == stdout || __g_loghandle == stderr) {
+			fprintf(__g_loghandle, "\x1B[%d;0m", color + 30);
+			fprintf(__g_loghandle, "\x1B[%dm[%s] [%s] %s", bgcolor + 40, timestamp, slevel, buffer);
+			reset_style(__g_loghandle);
+			putc('\n', __g_loghandle);
+			fflush(__g_loghandle);
+		} else
+#endif	/* #if defined(ENABLE_TERMIOS_MANIPULATION) && defined(__unix) */
+			fprintf(__g_loghandle, "[%s] [%s] %s\n", timestamp, slevel, buffer);
 	}
 }
 

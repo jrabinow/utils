@@ -57,6 +57,8 @@
 /* Terminal manipulation functions, as well as color text printing */
 /* Don't bother trying to enable this on windows */
 #define ENABLE_TERMIOS_MANIPULATION
+/* Threading functions */
+#define ENABLE_THREADING
 /* Memory pool, to cache heap memory and avoid having to call malloc. Idea is that
  * we often ask for same memory sizes (nodes in a linked list or tree, data structures
  * each requiring the same amount of memory...). This memory pool reduces overhead caused
@@ -407,7 +409,7 @@ void set_style(Color c, Color bgc, Style s);
 void stylish_print(char *str, Color c, Color bgc, Style s);
 
 /* reset everything to default */
-#define reset_style()		printf("\x1B[0m")
+#define reset_style(stream)		fprintf(stream, "\x1B[0m")
 
 /* Do not display keyboard input on terminal */
 void turn_echoing_off(void);
@@ -422,6 +424,25 @@ void instant_getchar(void);
 void normal_getchar(void);
 
 #endif	/* #if defined(ENABLE_TERMIOS_MANIPULATION) && defined(__unix) */
+
+/* -------------------- Threading -------------------- */
+#ifdef ENABLE_THREADING
+
+#include <pthread.h>
+
+#define DETACH_THREAD		1
+#define NO_DETACH_THREAD	0
+
+/* launches start_routine in a new thread with arg as argument. detach is a flag
+ * to tell if we should call pthread_detach on new thread or not.
+ * Returns thread id variable */
+pthread_t launch_thread(void *(start_routine)(void*), void *arg, int detach);
+#ifdef ENABLE_ERROR_HANDLING
+pthread_t xlaunch_thread(void *(*start_routine)(void*), void *arg, int detach);
+void *xpthread_join(pthread_t thread);
+#endif /* #ifdef ENABLE_ERROR_HANDLING */
+
+#endif /* #ifdef ENABLE_THREADING */
 
 
 
@@ -490,6 +511,22 @@ void *initialize_vector(void *dest, const void *src, size_t size, size_t nmemb);
  * signal signum. As usual, signals SIGKILL and SIGSTOP cannot be ignored or intercepted */
 void register_signal_handler(int signum, void (*sighandler)(int));
 #endif /* #ifdef __unix */
+
+#include <stdarg.h>
+#include <time.h>
+typedef enum {
+	LOG_DEBUG,
+	LOG_INFO,
+	LOG_WARNING,
+	LOG_ERROR,
+	LOG_FATAL
+} log_level_t;
+
+/* Initialize log system on file stream. You MUST call this before calling
+ * the log_message function */
+void init_log(FILE *stream, log_level_t loglevel);
+/* logs a message following printf conventions */
+void log_message(log_level_t level, const char *format, ... );
 
 /* prints errmsg to stderr and calls exit(). Functions previously registered with atexit()
  * will be called */
