@@ -692,26 +692,6 @@ void *initialize_vector(void *dest, const void *src, size_t size, size_t nmemb)
 	return dest;
 }
 
-/* Zeller's congruence */
-Weekday get_day_of_week(int day, int month, int year)
-{
-	int k, j;
-	Weekday d;
-
-	if(month == 1) {
-		month = 13;
-		year--;
-	}
-	if(month == 2) {
-		month = 14;
-		year--;
-	}
-	k = year % 100;
-	j = year / 100;
-	d = (day + 13 * (month + 1) / 5 + k + k / 4 + j / 4 + 5 * j) % 7;
-	return d <= 1 ? d + 5 : d - 2;
-}
-
 /* xmalloc, xrealloc */
 char *read_line(FILE *stream)
 {
