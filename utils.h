@@ -57,6 +57,13 @@
 /* Terminal manipulation functions, as well as color text printing */
 /* Don't bother trying to enable this on windows */
 #define ENABLE_TERMIOS_MANIPULATION
+/* Memory pool, to cache heap memory and avoid having to call malloc. Idea is that
+ * we often ask for same memory sizes (nodes in a linked list or tree, data structures
+ * each requiring the same amount of memory...). This memory pool reduces overhead caused
+ * by memory allocation
+ * This implementation is highly experimental and suffers from a few limitations. Proceed
+ * with caution */
+/*#define ENABLE_MEMPOOL */
 /* miscellaneous functions */
 #define ENABLE_MISC
 
@@ -415,6 +422,30 @@ void instant_getchar(void);
 void normal_getchar(void);
 
 #endif	/* #if defined(ENABLE_TERMIOS_MANIPULATION) && defined(__unix) */
+
+
+
+/* -------------------- Memory pool -------------------- */
+#ifdef ENABLE_MEMPOOL
+
+struct mempool {
+	void *mem, **ptrs;
+	size_t size, nmemb, index;
+};
+
+/* create memory pool of nmemb elements, each of size size */
+void mempool_create(struct mempool *mp, size_t size, size_t nmemb);
+
+/* obtain one element from the mempool */
+void *mempool_alloc(struct mempool *mp);
+
+/* free the memory pointed to by ptr back into the memory pool */
+void mempool_free(struct mempool *mp, void *ptr);
+
+/* once done using the memory pool, delete it */
+void mempool_delete(struct mempool *mp);
+
+#endif /* #ifdef ENABLE_MEMPOOL */
 
 
 
