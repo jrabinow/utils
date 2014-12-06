@@ -1,4 +1,4 @@
-/* utilsV5.c 
+/* utilsV5.c
  * Copyright (C) Julien Rabinow <jnr305@nyu.edu>
  *
  * utilsV5.c is free software: you can redistribute it and/or modify it
@@ -1138,6 +1138,85 @@ void normal_getchar(void)
 }
 
 #endif /* #if defined(ENABLE_TERMIOS_MANIPULATION) && defined(__unix) */
+
+
+/* -------------------- Memory pool -------------------- */
+#ifdef ENABLE_MEMPOOL
+
+void mempool_create(struct mempool *mp, size_t size, size_t nmemb)
+{
+	unsigned i;
+	void *val;
+
+#if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING)
+	mp->mem = xmalloc((sizeof(unsigned) + size) * nmemb);
+	mp->ptrs = xmalloc(sizeof(unsigned*) * nmemb);
+#else
+	mp->mem = malloc((sizeof(unsigned) + size) * nmemb);
+	mp->ptrs = malloc(sizeof(unsigned*) * nmemb);
+	if(mp->ptrs == NULL || mp->mem == NULL) {
+		free(mp->mem);
+		free(mp->ptrs);
+		mp->mem = NULL;
+		mp->ptrs = NULL;
+		return;
+	}
+#endif /* #if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING) */
+	mp->size = size;
+	mp->nmemb = nmemb;
+	mp->index = 0;
+
+	val = mp->mem;
+	for(i = 0; i < nmemb; i++) {
+		mp->ptrs[i] = val;
+		val = (void*) ((byte*) val + sizeof(unsigned) + size);
+	}
+}
+
+void *mempool_alloc(struct mempool *mp)
+{
+/*
+ * Problem when enlarging memory pool: mp->mem will point to a different chunk of mem,
+ * but the pointers pointing to the memory in the mempool will not be updated. Not much
+ * we can do about that as of now => let's  disable pool enlarging
+ *
+ * WARNING: this means that if you call mempool_alloc more than is reasonable, you WILL
+ * have problems
+ *
+	unsigned i;
+	void *val;
+
+	if(mp->index == mp->nmemb) {
+		mp->mem = xrealloc(mp->mem, (sizeof(unsigned) + mp->size) * (mp->nmemb <<= 1));
+		mp->ptrs = xrealloc(mp->ptrs, sizeof(unsigned*) * mp->nmemb);
+
+		val = mp->mem;
+		for(i = 0; i < mp->nmemb; i++) {
+			mp->ptrs[i] = val;
+			val += sizeof(unsigned) + mp->size;
+		}
+	}
+*/
+	*(unsigned*) mp->ptrs[mp->index] = mp->index;
+	return (byte*) mp->ptrs[mp->index++] + sizeof(unsigned);
+}
+
+void mempool_free(struct mempool *mp, void *ptr)
+{
+	void *swap;
+	unsigned idx = *(unsigned*) ((byte*) ptr - sizeof(unsigned));
+
+	swap = mp->ptrs[idx];
+	mp->ptrs[idx] = mp->ptrs[--mp->index];
+	mp->ptrs[mp->index] = swap;
+}
+
+void mempool_delete(struct mempool *mp)
+{
+	free(mp->mem);
+	free(mp->ptrs);
+}
+#endif /* #ifdef ENABLE_MEMPOOL */
 
 
 /* -------------------- Misc functions -------------------- */
