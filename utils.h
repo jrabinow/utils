@@ -40,8 +40,8 @@
  * this feature:
  * https://lkml.org/lkml/2013/8/31/138 */
 /* #define ENABLE_BOOL_TYPE */
-/* Enables memory management such as heap memory identification, memory pool
- * manipulation. Planned: leak detection and related stuff */
+/* Enables memory management such as heap memory identification. Planned: leak
+ * detection and related stuff */
 /*#define MANAGE_MEM */
 /* define error "squashing" functions. Program exits if error happens. Disable
  * if your application must meet certain robustness requirements */
@@ -50,12 +50,12 @@
 #define ENABLE_STRING_MANIPULATION
 /* easily read data from streams/file descriptors */
 #define ENABLE_READ_DATA
-/* string splitting functions */
+/* Bitset */
 #define ENABLE_BITSET
 /* directory navigation functions */
 #define ENABLE_FILESYSTEM
 /* Terminal manipulation functions, as well as color text printing */
-/* Don't bother trying to enable this on windows */
+/* Will not work on windows machine */
 #define ENABLE_TERMIOS_MANIPULATION
 /* Threading functions */
 #define ENABLE_THREADING
@@ -87,14 +87,6 @@
  * line.
  * -------------------------------------------------------------------------- */
 
-#ifdef USE_BOOL
-#define BOOL_FALSE false
-#define BOOL_TRUE true
-#else
-#define BOOL_FALSE 0
-#define BOOL_TRUE 1
-#endif
-
 extern int errno;
 
 #include <stdint.h>
@@ -102,15 +94,20 @@ extern int errno;
  typedef uint8_t byte;
 #else
  typedef unsigned char byte;
-#endif
+#endif /* #ifdef _STDINT_H */
 
 #ifdef ENABLE_BOOL_TYPE
+# define BOOL_FALSE false
+# define BOOL_TRUE true
 # ifdef C99
 #  include <stdbool.h>
 # else
    typedef enum { false = 0, true = 1 } bool;
 # endif
-#endif
+#else
+# define BOOL_FALSE 0
+# define BOOL_TRUE 1
+#endif /* #ifdef ENABLE_BOOL_TYPE */
 
 #if defined(MANAGE_MEM) || defined(ENABLE_ERROR_HANDLING)
 # define MAX_RETRIES_ALLOC	3
@@ -153,7 +150,10 @@ void xfree(void *ptr);
 
 #ifdef __unix
 # include <unistd.h>
+# include <fcntl.h>
+# include <signal.h>
 #endif /* #ifdef __unix */
+
 /* exit program with failed status if malloc and consorts fail
  * -> no more error checking necessary
  * free() when done */
@@ -169,10 +169,7 @@ FILE *xfopen(const char *file, const char *mode);
  * Calls exit() at failure */
 FILE *xfdopen(int fd, const char *mode);
 
-#ifndef __unix
-#include <unistd.h>
-#include <fcntl.h>
-#include <signal.h>
+#ifdef __unix
 int xopen(const char *path, int flags);
 #ifdef INTERNAL_ERROR_HANDLING
 /* attempts to create a pipe. Calls exit() at failure */
@@ -181,6 +178,7 @@ int xopen(const char *path, int flags);
 		perror("Error creating pipe ");\
 		exit(EXIT_FAILURE);\
 	}
+
 /* attempts to duplicate file descriptor oldfd to newfd. Calls exit() at failure */
 #define xdup2(oldfd, newfd)\
 	if(dup2(oldfd, newfd) == -1) {\
@@ -408,7 +406,7 @@ typedef enum { NORMAL, BOLD, DARK, ITALIC, UNDERLINED } Style;
 void set_style(Color c, Color bgc, Style s);
 
 /* print a single string str with font color c, background color bgc and style s
- * without modifying the terminal state */
+ * restores previous state of terminal after printing str */
 void stylish_print(char *str, Color c, Color bgc, Style s);
 
 /* reset everything to default */
