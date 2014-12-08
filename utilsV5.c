@@ -801,7 +801,7 @@ size_t split_str_lite(char *str, const char separator, char ***returnArray)
 		}
 	}
 	if(i != 0)
-		(*returnArray)[count] = str;
+		(*returnArray)[count++] = str;
 	return count;
 }
 
