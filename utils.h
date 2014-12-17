@@ -171,7 +171,6 @@ FILE *xfdopen(int fd, const char *mode);
 
 #ifdef __unix
 int xopen(const char *path, int flags);
-#ifdef INTERNAL_ERROR_HANDLING
 /* attempts to create a pipe. Calls exit() at failure */
 #define xpipe(pipefd)\
 	if(pipe(pipefd) != 0) {\
@@ -185,7 +184,6 @@ int xopen(const char *path, int flags);
 		perror("Error redirecting output ");\
 		exit(EXIT_FAILURE);\
 	}
-#endif /* #ifdef INTERNAL_ERROR_HANDLING */
 #endif /* #ifdef __unix */
 
 #endif /* #ifdef ENABLE_ERROR_HANDLING */
@@ -412,17 +410,25 @@ void stylish_print(char *str, Color c, Color bgc, Style s);
 /* reset everything to default */
 #define reset_style(stream)		fprintf(stream, "\x1B[0m")
 
-/* Do not display keyboard input on terminal */
-void turn_echoing_off(void);
+/* Do not display keyboard input on terminal
+ * If internal error management is disabled, returns 0 on success, -1 on
+ * error and sets errno to appropriate value */
+int turn_echoing_off(void);
 
-/* Display keyboard input on terminal */
-void turn_echoing_on(void);
+/* Display keyboard input on terminal
+ * If internal error management is disabled, returns 0 on success, -1 on
+ * error and sets errno to appropriate value */
+int turn_echoing_on(void);
 
-/* program reads input without user having to press enter */
-void instant_getchar(void);
+/* program reads input without user having to press enter
+ * If internal error management is disabled, returns 0 on success, -1 on
+ * error and sets errno to appropriate value */
+int instant_getchar(void);
 
-/* Restore default behaviour */
-void normal_getchar(void);
+/* Restore default behaviour
+ * If internal error management is disabled, returns 0 on success, -1 on
+ * error and sets errno to appropriate value */
+int normal_getchar(void);
 
 #endif	/* #if defined(ENABLE_TERMIOS_MANIPULATION) && defined(__unix) */
 

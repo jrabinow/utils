@@ -78,7 +78,7 @@ void xfree(void *ptr)
 #endif /* #ifdef MANAGE_MEM */
 
 /* -------------------- ERROR HANDLING -------------------- */
-#ifdef ENABLE_ERROR_HANDLING
+#if defined(ENABLE_ERROR_HANDLING) || defined(INTERNAL_ERROR_HANDLING)
 void *xmalloc(size_t size)
 {
 	void *ptr = NULL;
@@ -349,7 +349,7 @@ int xopen(const char *path, int flags)
 }
 #endif /* ifndef __unix */
 
-#endif /* #ifdef ENABLE_ERROR_HANDLING */
+#endif /* #if defined(ENABLE_ERROR_HANDLING) || defined(INTERNAL_ERROR_HANDLING) */
 
 /* -------------------- STRING MANIPULATION -------------------- */
 #ifdef ENABLE_STRING_MANIPULATION
@@ -463,17 +463,17 @@ char *const_append(const char *str1, const char *str2)
 
 	len1 = strlen(str1);
 	len2 = strlen(str2);
-#if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING)
+#ifdef INTERNAL_ERROR_HANDLING
 	new_str = (char*) xmalloc(len1 + len2 + 1);
 #else
 	new_str = (char*) malloc(len1 + len2 + 1);
 	if(new_str != (char*) NULL) {
-#endif /* if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING) */
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
 		memcpy(new_str, str1, len1);
 		memcpy(new_str + len1, str2, len2 + 1);
-#if ! defined(ENABLE_ERROR_HANDLING) || ! defined(INTERNAL_ERROR_HANDLING)
+#ifndef INTERNAL_ERROR_HANDLING
 	}
-#endif /* #if ! defined(ENABLE_ERROR_HANDLING) || ! defined(INTERNAL_ERROR_HANDLING) */
+#endif /* #ifndef INTERNAL_ERROR_HANDLING */
 
 	return new_str;
 }
@@ -487,12 +487,12 @@ char *append(char *str1, const char *str2)
 #endif /* #ifdef MANAGE_MEM */
 	len1 = strlen(str1);
 	len2 = strlen(str2);
-#if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING)
+#ifdef INTERNAL_ERROR_HANDLING
 	str1 = (char*) xrealloc(str1, len1 + len2 + 1);
 #else
 	str1 = (char*) realloc(str1, len1 + len2 + 1);
 	if(str1 != (char*) NULL)
-#endif /* if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING) */
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
 		memcpy(str1 + len1, str2, len2 + 1);
 
 	return str1;
@@ -508,17 +508,17 @@ char *extract(const char *str, char start, char end)
 	if(*str != '\0') {
 		for(str++, i = 0; str[i] != end && str[i] != '\0'; i++);
 		if(str[i] != '\0' || end == '\0') {
-#if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING)
+#ifdef INTERNAL_ERROR_HANDLING
 			extracted = (char*) xmalloc(i + 1);
 #else
 			extracted = (char*) malloc(i + 1);
 			if(extracted != (char*) NULL) {
-#endif /* if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING) */
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
 				memcpy(extracted, str, i);
 				extracted[i] = '\0';
-#if ! defined(ENABLE_ERROR_HANDLING) || ! defined(INTERNAL_ERROR_HANDLING)
+#ifndef INTERNAL_ERROR_HANDLING
 			}
-#endif /* #if ! defined(ENABLE_ERROR_HANDLING) || ! defined(INTERNAL_ERROR_HANDLING) */
+#endif /* #ifndef INTERNAL_ERROR_HANDLING */
 		}
 	}
 	return extracted;
@@ -537,17 +537,17 @@ char *trim(const char *str)
 		if(isspace(*ptr) && ! isspace(*(ptr - 1)))
 			end_str = ptr;
 	len = (size_t) (end_str - start_str);
-#if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING)
+#ifdef INTERNAL_ERROR_HANDLING
 	ptr = (char*) xmalloc(len + 1);
 #else
 	ptr = (char*) malloc(len + 1);
 	if(ptr != (char*) NULL) {
-#endif /* if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING) */
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
 		memcpy(ptr, start_str, len);
 		ptr[len] = '\0';
-#if ! defined(ENABLE_ERROR_HANDLING) || ! defined(INTERNAL_ERROR_HANDLING)
+#ifndef INTERNAL_ERROR_HANDLING
 	}
-#endif /* #if ! defined(ENABLE_ERROR_HANDLING) || ! defined(INTERNAL_ERROR_HANDLING) */
+#endif /* #ifndef INTERNAL_ERROR_HANDLING */
 
 	return ptr;
 }
@@ -558,18 +558,18 @@ char *insert(const char *str, char c, size_t pos)
 	size_t len = strlen(str);
 
 	if(pos <= len) {
-#if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING)
+#ifdef INTERNAL_ERROR_HANDLING
 		new_str = (char*) xmalloc(len + 2);
 #else
 		new_str = (char*) malloc(len + 2);
 		if(new_str != (char*) NULL) {
-#endif /* if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING) */
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
 			memcpy(new_str, str, pos);
 			new_str[pos] = c;
 			memcpy(new_str + pos + 1, str + pos, len - pos + 1);
-#if ! defined(ENABLE_ERROR_HANDLING) || ! defined(INTERNAL_ERROR_HANDLING)
+#ifndef INTERNAL_ERROR_HANDLING
 		}
-#endif /* #if ! defined(ENABLE_ERROR_HANDLING) || ! defined(INTERNAL_ERROR_HANDLING) */
+#endif /* #ifndef INTERNAL_ERROR_HANDLING */
 	}
 	return new_str;
 }
@@ -582,18 +582,18 @@ char *insert_str(const char *str, const char *ins, size_t pos)
 	len1 = strlen(str);
 	if(pos <= len1) {
 		len2 = strlen(ins);
-#if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING)
+#ifdef INTERNAL_ERROR_HANDLING
 		new_str = (char*) xmalloc(len1 + len2 + 1);
 #else
 		new_str = (char*) malloc(len1 + len2 + 1);
 		if(new_str != (char*) NULL) {
-#endif /* if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING) */
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
 			memcpy(new_str, str, pos);
 			memcpy(new_str + pos, ins, len2);
 			memcpy(new_str + pos + len2, str + pos, len1 - pos + 1);
-#if ! defined(ENABLE_ERROR_HANDLING) || ! defined(INTERNAL_ERROR_HANDLING)
+#ifndef INTERNAL_ERROR_HANDLING
 		}
-#endif /* #if ! defined(ENABLE_ERROR_HANDLING) || ! defined(INTERNAL_ERROR_HANDLING) */
+#endif /* #ifndef INTERNAL_ERROR_HANDLING */
 	}
 	return new_str;
 }
@@ -604,17 +604,17 @@ char *erase(const char *str, size_t pos)
 	size_t len = strlen(str);
 
 	if(pos < len) {
-#if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING)
+#ifdef INTERNAL_ERROR_HANDLING
 		new_str = (char*) xmalloc(len);
 #else
 		new_str = (char*) malloc(len);
 		if(new_str != (char*) NULL) {
-#endif /* if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING) */
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
 			memcpy(new_str, str, pos);
 			memcpy(new_str + pos, str + pos + 1, len - pos);
-#if ! defined(ENABLE_ERROR_HANDLING) || ! defined(INTERNAL_ERROR_HANDLING)
+#ifndef INTERNAL_ERROR_HANDLING
 		}
-#endif /* #if ! defined(ENABLE_ERROR_HANDLING) || ! defined(INTERNAL_ERROR_HANDLING) */
+#endif /* #ifndef INTERNAL_ERROR_HANDLING */
 	}
 	return new_str;
 }
@@ -625,17 +625,17 @@ char *erase_str(const char *str, size_t pos, size_t len)
 	size_t len2 = strlen(str), new_len = len2 - len + 1;
 
 	if(pos + len <= len2) {
-#if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING)
+#ifdef INTERNAL_ERROR_HANDLING
 		new_str = (char*) xmalloc(new_len);
 #else
 		new_str = (char*) malloc(new_len);
 		if(new_str != (char*) NULL) {
-#endif /* if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING) */
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
 		memcpy(new_str, str, pos);
 		memcpy(new_str + pos, str + pos + len, new_len - pos);
-#if ! defined(ENABLE_ERROR_HANDLING) || ! defined(INTERNAL_ERROR_HANDLING)
+#ifndef INTERNAL_ERROR_HANDLING
 		}
-#endif /* #if ! defined(ENABLE_ERROR_HANDLING) || ! defined(INTERNAL_ERROR_HANDLING) */
+#endif /* #ifndef INTERNAL_ERROR_HANDLING */
 
 	}
 	return new_str;
@@ -649,21 +649,21 @@ char *replace_str(const char *haystack, const char *needle, const char *replacem
 	       len_haystack = strlen(haystack);
 
 	if(ptr != (char*) NULL) {
-#if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING)
+#ifdef INTERNAL_ERROR_HANDLING
 		new_str = xmalloc(len_haystack - len_needle + len_replacement + 1);
 #else
 		new_str = malloc(len_haystack - len_needle + len_replacement + 1);
 		if(new_str != (char*) NULL) {
-#endif /* if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING) */
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
 			memcpy(new_str, haystack, ptr - haystack);
 			memcpy((byte*)((intptr_t) new_str + (intptr_t) ptr -
 						(intptr_t) haystack), replacement, len_replacement);
 			memcpy((byte*)((intptr_t) new_str + (intptr_t) ptr -
 						(intptr_t) haystack) + len_replacement, ptr + len_needle,
 					len_haystack - (intptr_t) ptr + (intptr_t) haystack - len_needle);
-#if ! defined(ENABLE_ERROR_HANDLING) || ! defined(INTERNAL_ERROR_HANDLING)
+#ifndef INTERNAL_ERROR_HANDLING
 		}
-#endif /* #if ! defined(ENABLE_ERROR_HANDLING) || ! defined(INTERNAL_ERROR_HANDLING) */
+#endif /* #ifndef INTERNAL_ERROR_HANDLING */
 	}
 	return new_str;
 }
@@ -706,13 +706,13 @@ size_t split_str(const char *str, const char separator, char ***returnArray)
 	/* REPLACE PREVIOUS LINE WITH ABOVE COMMENTED LINE
 	 * TO NOT SKIP OVER CONSECUTIVE SEPARATORS */
 
-#if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING)
+#ifdef INTERNAL_ERROR_HANDLING
 	*returnArray = (char**) xmalloc(count * sizeof(char*));
 #else
 	*returnArray = (char**) malloc(count * sizeof(char*));
 	if(*returnArray == (char**) NULL)
 		return 0;
-#endif /* if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING) */
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
 
 	for(count = i = 0; str[i] != '\0'; i++) {
 		if(str[i] == separator) {
@@ -720,7 +720,7 @@ size_t split_str(const char *str, const char separator, char ***returnArray)
 			if(i == 0)
 				str++;
 			else {
-#if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING)
+#ifdef INTERNAL_ERROR_HANDLING
 				(*returnArray)[count] = (char*) xmalloc(i + 1);
 #else
 				(*returnArray)[count] = (char*) malloc(i + 1);
@@ -731,7 +731,7 @@ size_t split_str(const char *str, const char separator, char ***returnArray)
 					*returnArray = (char**) NULL;
 					return 0;
 				}
-#endif /* if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING) */
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
 				memcpy((*returnArray)[count], str, i);
 				(*returnArray)[count++][i] = '\0';
 				str += i+1;
@@ -740,7 +740,7 @@ size_t split_str(const char *str, const char separator, char ***returnArray)
 		}
 	}
 	if(i != 0) {
-#if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING)
+#ifdef INTERNAL_ERROR_HANDLING
 		(*returnArray)[count] = (char*) xmalloc(i + 1);
 #else
 		(*returnArray)[count] = (char*) malloc(i + 1);
@@ -751,7 +751,7 @@ size_t split_str(const char *str, const char separator, char ***returnArray)
 			*returnArray = (char**) NULL;
 			return 0;
 		}
-#endif /* if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING) */
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
 		strcpy((*returnArray)[count++], str);
 	}
 	return count;
@@ -779,13 +779,13 @@ size_t split_str_lite(char *str, const char separator, char ***returnArray)
 	/* REPLACE PREVIOUS LINE WITH ABOVE COMMENTED LINE
 	 * TO NOT SKIP OVER CONSECUTIVE SEPARATORS */
 
-#if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING)
+#ifdef INTERNAL_ERROR_HANDLING
 	*returnArray = (char**) xmalloc(count * sizeof(char*));
 #else
 	*returnArray = (char**) malloc(count * sizeof(char*));
 	if(*returnArray == (char**) NULL)
 		return 0;
-#endif /* if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING) */
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
 
 	for(count = i = 0; str[i] != '\0'; i++) {
 		if(str[i] == separator) {
@@ -816,13 +816,13 @@ char *read_line(FILE *stream)
 	unsigned i = 0;
 	unsigned current_size = 32;
 	char c;
-#if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING)
+#ifdef INTERNAL_ERROR_HANDLING
 	char *str = (char*) xmalloc(32);
 #else
 	char *str = (char*) malloc(32);
 	if(str != (char*) NULL)
 		return (char*) NULL;
-#endif /* if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING) */
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
 
 #ifdef _POSIX_THREAD_SAFE_FUNCTIONS	/* locking and getc_unlocked functions */
 	flockfile(stream);
@@ -832,13 +832,13 @@ char *read_line(FILE *stream)
 #endif /* #ifdef _POSIX_THREAD_SAFE_FUNCTIONS */
 		{
 			if(i == current_size) {
-#if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING)
+#ifdef INTERNAL_ERROR_HANDLING
 				str = (char*) xrealloc(str, current_size <<= 1);
 #else
 				str = (char*) realloc(str, current_size <<= 1);
 				if(str == (char*) NULL)
 					return (char*) NULL;
-#endif /* if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING) */
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
 			}
 			str[i++] = c;
 		}
@@ -846,24 +846,24 @@ char *read_line(FILE *stream)
 	funlockfile(stream);
 #endif /* #ifdef _POSIX_THREAD_SAFE_FUNCTIONS */
 	if(i == current_size) {
-#if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING)
+#ifdef INTERNAL_ERROR_HANDLING
 		str = (char*) xrealloc(str, current_size += 1);
 #else
 		str = (char*) realloc(str, current_size += 1);
 		if(str == (char*) NULL)
 			return (char*) NULL;
-#endif /* if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING) */
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
 	} else if(c == EOF && i == 0) {
 		free(str);
 		return (char*) NULL;
 	} else {
-#if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING)
+#ifdef INTERNAL_ERROR_HANDLING
 		str = xrealloc(str, i + 1);
 #else
 		str = realloc(str, i + 1);
 		if(str == (char*) NULL)
 			return (char*) NULL;
-#endif /* if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING) */
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
 	}
 	str[i] = '\0';
 	return str;
@@ -873,13 +873,13 @@ char *read_file_descriptor(int fd)
 {
 	unsigned current_size = 32;
 	ssize_t i = 0;
-#if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING)
+#ifdef INTERNAL_ERROR_HANDLING
 	char *str = (char*) xmalloc(32);
 #else
 	char *str = (char*) malloc(32);
 	if(str != (char*) NULL)
 		return (char*) NULL;
-#endif /* if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING) */
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
 
 	/* read (current_size - i) chars at a time, double current_size and increment
 	 * i by the number of characters read and repeat until no more characters
@@ -887,13 +887,13 @@ char *read_file_descriptor(int fd)
 	do {
 		i += read(fd, str + i, current_size - i);
 		if(i == current_size) {
-#if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING)
+#ifdef INTERNAL_ERROR_HANDLING
 			str = xrealloc(str, current_size <<= 1);
 #else
 			str = realloc(str, current_size <<= 1);
 			if(str != (char*) NULL)
 				return (char*) NULL;
-#endif /* if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING) */
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
 		}
 	} while(i << 1 == current_size);
 
@@ -907,7 +907,7 @@ char *read_file_descriptor(int fd)
 			i--;
 		/* allocate precisely as much memory (not a single byte more)
 		 * as is needed to contain the data */
-#if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING)
+#ifdef INTERNAL_ERROR_HANDLING
 		if(i == current_size)
 			str = (char*) xrealloc(str, current_size += 1);
 		else
@@ -919,7 +919,7 @@ char *read_file_descriptor(int fd)
 			str = (char*) realloc(str, i + 1);
 		if(str == (char*) NULL)
 			return (char*) NULL;
-#endif /* if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING) */
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
 		str[i] = '\0';
 	}
 	return str;
@@ -978,18 +978,18 @@ char *make_path(const char *old_path, const char *dir_name)
 
 	len1 = strlen(old_path);
 	len2 = strlen(dir_name);
-#if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING)
+#ifdef INTERNAL_ERROR_HANDLING
 	new_path = (char*) xmalloc(len1 + len2 + 2);
 #else
 	new_path = (char*) malloc(len1 + len2 + 2);
 	if(new_path != (char*) NULL) {
-#endif /* if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING) */
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
 	memcpy(new_path, old_path, len1);
 	new_path[len1] = FILE_SEPARATOR;
 	memcpy(new_path + len1 + 1, dir_name, len2 + 1);
-#if ! defined(ENABLE_ERROR_HANDLING) || ! defined(INTERNAL_ERROR_HANDLING)
+#ifndef INTERNAL_ERROR_HANDLING
 	}
-#endif /* #if ! defined(ENABLE_ERROR_HANDLING) || ! defined(INTERNAL_ERROR_HANDLING) */
+#endif /* #ifndef INTERNAL_ERROR_HANDLING */
 	return new_path;
 }
 #undef FILE_SEPARATOR
@@ -1006,12 +1006,12 @@ void *dirwalk(const char *path, void* (*func)(void*, char*), void *arg)
 		while((entry = readdir(dir)) != (struct dirent*) NULL) {
 			if(strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) {
 				new_path = make_path(path, entry->d_name);
-#if ! defined(ENABLE_ERROR_HANDLING) || ! defined(INTERNAL_ERROR_HANDLING)
+#ifndef INTERNAL_ERROR_HANDLING
 				if(new_path == (char*) NULL) {
 					closedir(dir);
 					return NULL;
 				}
-#endif /* #if ! defined(ENABLE_ERROR_HANDLING) || ! defined(INTERNAL_ERROR_HANDLING) */
+#endif /* #ifndef INTERNAL_ERROR_HANDLING */
 #ifdef _WIN32
 				if(is_dir(new_path))
 #else
@@ -1059,83 +1059,103 @@ void stylish_print(char *str, Color c, Color bgc, Style s)
 	fflush(stdout);
 }
 
-void turn_echoing_off(void)
+int turn_echoing_off(void)
 {
 	struct termios term;
 
 	if(tcgetattr(STDIN_FILENO, &term) != 0) {
-#if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING)
+#ifdef INTERNAL_ERROR_HANDLING
 		perror("Error manipulating terminal ");
 		exit(EXIT_FAILURE);
-#endif /* #if ! defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING) */
+#else
+		return -1;
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
 	}
 	term.c_lflag &= ~ECHO;
 	if(tcsetattr(STDIN_FILENO, TCSAFLUSH, &term) != 0) {
-#if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING)
+#ifdef INTERNAL_ERROR_HANDLING
 		perror("Error manipulating terminal ");
 		exit(EXIT_FAILURE);
-#endif /* #if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING) */
+#else
+		return -1;
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
 	}
+	return 0;
 }
 
-void turn_echoing_on(void)
+int turn_echoing_on(void)
 {
 	struct termios term;
 
 	if(tcgetattr(STDIN_FILENO, &term) != 0) {
-#if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING)
+#ifdef INTERNAL_ERROR_HANDLING
 		perror("Error manipulating terminal ");
 		exit(EXIT_FAILURE);
-#endif /* #if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING) */
+#else
+		return -1;
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
 	}
 	term.c_lflag |= ECHO;
 	if(tcsetattr(STDIN_FILENO, TCSAFLUSH, &term) != 0) {
-#if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING)
+#ifdef INTERNAL_ERROR_HANDLING
 		perror("Error manipulating terminal ");
 		exit(EXIT_FAILURE);
-#endif /* #if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING) */
+#else
+		return -1;
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
 	}
+	return 0;
 }
 
-void instant_getchar(void)
+int instant_getchar(void)
 {
 	struct termios term;
 
 	if(tcgetattr(STDIN_FILENO, &term) != 0) {
-#if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING)
+#ifdef INTERNAL_ERROR_HANDLING
 		perror("Error manipulating terminal ");
 		exit(EXIT_FAILURE);
-#endif /* #if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING) */
+#else
+		return -1;
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
 	}
 	term.c_lflag &= ~ICANON;
 	term.c_cc[VMIN] = 1;
 	term.c_cc[VTIME] = 0;
 
 	if(tcsetattr(STDIN_FILENO, TCSAFLUSH, &term) != 0) {
-#if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING)
+#ifdef INTERNAL_ERROR_HANDLING
 		perror("Error manipulating terminal ");
 		exit(EXIT_FAILURE);
-#endif /* #if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING) */
+#else
+		return -1;
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
 	}
+	return 0;
 }
 
-void normal_getchar(void)
+int normal_getchar(void)
 {
 	struct termios term;
 
 	if(tcgetattr(STDIN_FILENO, &term) != 0) {
-#if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING)
+#ifdef INTERNAL_ERROR_HANDLING
 		perror("Error manipulating terminal ");
 		exit(EXIT_FAILURE);
-#endif /* #if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING) */
+#else
+		return -1;
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
 	}
 	term.c_lflag |= ICANON;
 	if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &term) != 0) {
-#if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING)
+#ifdef INTERNAL_ERROR_HANDLING
 		perror("Error manipulating terminal ");
 		exit(EXIT_FAILURE);
-#endif /* #if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING) */
+#else
+		return -1;
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
 	}
+	return 0;
 }
 
 #endif /* #if defined(ENABLE_TERMIOS_MANIPULATION) && defined(__unix) */
@@ -1177,8 +1197,8 @@ void *xpthread_join(pthread_t thread)
 	}
 	return retval;
 }
-
 #endif /* #ifdef ENABLE_ERROR_HANDLING */
+
 #endif /* #ifdef ENABLE_THREADING */
 
 /* -------------------- Memory pool -------------------- */
@@ -1189,7 +1209,7 @@ void mempool_create(struct mempool *mp, size_t size, size_t nmemb)
 	unsigned i;
 	void *val;
 
-#if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING)
+#ifdef INTERNAL_ERROR_HANDLING
 	mp->mem = xmalloc((sizeof(unsigned) + size) * nmemb);
 	mp->ptrs = xmalloc(sizeof(unsigned*) * nmemb);
 #else
@@ -1202,7 +1222,7 @@ void mempool_create(struct mempool *mp, size_t size, size_t nmemb)
 		mp->ptrs = NULL;
 		return;
 	}
-#endif /* #if defined(ENABLE_ERROR_HANDLING) && defined(INTERNAL_ERROR_HANDLING) */
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
 	mp->size = size;
 	mp->nmemb = nmemb;
 	mp->index = 0;
@@ -1258,6 +1278,29 @@ void mempool_delete(struct mempool *mp)
 	free(mp->ptrs);
 }
 #endif /* #ifdef ENABLE_MEMPOOL */
+
+
+
+/* -------------------- Config file -------------------- */
+#ifdef ENABLE_CONFIG_FILE
+#define CFG_FILE_START_SIZE 8
+Config_File create_config_file(const char *path)
+{
+	Config_File cfg_file;
+	cfg_file.size = 0;
+#ifdef INTERNAL_ERROR_HANDLING
+	cfg_file.file = xfopen(path, "w");
+	cfg_file. = (Cfg_Var*) xmalloc(CFG_FILE_START_SIZE * sizeof(Cfg_Var));
+#else
+	cfg_file.file = fopen(path, "w");
+	if(cfg_file.file == NULL) {
+	cfg_file. = (Cfg_Var*) malloc(CFG_FILE_START_SIZE * sizeof(Cfg_Var));
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
+
+	return cfg_file;
+}
+#endif /* #ifdef ENABLE_CONFIG_FILE */
+
 
 
 /* -------------------- Misc functions -------------------- */
@@ -1365,10 +1408,10 @@ void register_signal_handler(int signum, void (*sighandler)(int))
 	memset(&new_sigaction, 0, sizeof(struct sigaction));
 	new_sigaction.sa_handler = sighandler;
 	if(sigaction(signum, &new_sigaction, (struct sigaction*) NULL) != 0) {
-#if ! defined(ENABLE_ERROR_HANDLING) || ! defined(INTERNAL_ERROR_HANDLING)
+#ifndef INTERNAL_ERROR_HANDLING
 		perror("Error registering signal handler ");
 		exit(EXIT_FAILURE);
-#endif /* #if ! defined(ENABLE_ERROR_HANDLING) || ! defined(INTERNAL_ERROR_HANDLING) */
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
 	}
 }
 
