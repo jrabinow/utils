@@ -18,16 +18,6 @@
 #ifndef UTILS_H
 #define UTILS_H
 
-#if defined(__STDC__)
-# define C89
-# if defined(__STDC_VERSION__)
-#  define C90
-#  if (__STDC_VERSION__ >= 199901L) && ! defined C99
-#   define C99
-#  endif
-# endif
-#endif
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -58,7 +48,7 @@
 /* Will not work on windows machine */
 #define ENABLE_TERMIOS_MANIPULATION
 /* Threading functions */
-#define ENABLE_THREADING
+/* #define ENABLE_THREADING */
 /* Memory pool, to cache heap memory and avoid having to call malloc. Idea is that
  * we often ask for same memory sizes (nodes in a linked list or tree, data structures
  * each requiring the same amount of memory...). This memory pool reduces overhead caused
@@ -86,6 +76,16 @@
 /* Library configuration done. You shouldn't need to modify anything below this
  * line.
  * -------------------------------------------------------------------------- */
+
+#if defined(__STDC__)
+# define C89
+# if defined(__STDC_VERSION__)
+#  define C90
+#  if (__STDC_VERSION__ >= 199901L) && ! defined C99
+#   define C99
+#  endif
+# endif
+#endif
 
 extern int errno;
 
