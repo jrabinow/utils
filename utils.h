@@ -31,20 +31,20 @@
  * https://lkml.org/lkml/2013/8/31/138 */
 /* #define ENABLE_BOOL_TYPE */
 /* Enables memory management such as heap memory identification. Planned: leak
- * detection and related stuff */
-/*#define MANAGE_MEM */
+ * detection and related */
+/* #define MANAGE_MEM */
 /* define error "squashing" functions. Program exits if error happens. Disable
  * if your application must meet certain robustness requirements */
 #define ENABLE_ERROR_HANDLING
-/* various string manipulation functions */
+/* Various string manipulation functions */
 #define ENABLE_STRING_MANIPULATION
-/* easily read data from streams/file descriptors */
+/* Easily read data from streams/file descriptors */
 #define ENABLE_READ_DATA
 /* Bitset */
 #define ENABLE_BITSET
-/* directory navigation functions */
+/* Directory navigation functions */
 #define ENABLE_FILESYSTEM
-/* networking related functions */
+/* Networking related functions */
 #define ENABLE_NETWORKING
 /* Terminal manipulation functions, as well as color text printing */
 /* Will not work on windows machine */
@@ -562,8 +562,8 @@ typedef enum {
 	LOG_FATAL
 } log_level_t;
 
-/* Initialize log system on file stream. You MUST call this before calling
- * the log_message function */
+/* Initialize log system on file stream. Logs by default on stderr. To completely
+ * disable logging, call init_log with stream parameter set to NULL */
 void init_log(FILE *stream, log_level_t loglevel);
 /* logs a message following printf conventions */
 void log_message(log_level_t level, const char *format, ... );
@@ -579,5 +579,8 @@ void failwith(char *errmsg);
 	b = __tmp__;\
 }
 
+#else
+# define log_message(loglvl, fmt, ...)	fprintf(stderr, fmt "\n", ##__VA_ARGS__)
 #endif /* #ifdef ENABLE_MISC */
+
 #endif	/* #ifndef UTILS_H */
