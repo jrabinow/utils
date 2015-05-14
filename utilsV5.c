@@ -37,24 +37,24 @@ void init_alloc(void)
 		if(heap_bottom == NULL)
 			switch(errno) {
 				case ENOMEM:
-					perror("Error allocating memory ");
+					log_message(LOG_ERROR, "Error allocating memory: %s", strerror(errno));
 					if(count++ < MAX_RETRIES_ALLOC) {
-						fputs("Retrying in 100ms\n", stderr);
+						log_message(LOG_ERROR, "Retrying in 100ms");
 						usleep(100);
 					} else {
-						fprintf(stderr, "Giving up after %d tries\n", MAX_RETRIES_ALLOC);
+						log_message(LOG_FATAL, "Giving up after %d tries", MAX_RETRIES_ALLOC);
 						exit(EXIT_FAILURE);
 					}
 					break;
 				default:
-					perror("Error allocating memory ");
+					log_message(LOG_FATAL, "Error allocating memory: %s", strerror(errno));
 					exit(EXIT_FAILURE);
 			}
 	} while(heap_bottom == NULL);
 #ifdef USING_VALGRIND
 	__initial_alloc__ = heap_bottom;
 	if(atexit(&__clean_initial_alloc)) {
-		perror("Error registering cleanup function ");
+		log_message(LOG_FATAL, "Error registering cleanup function");
 		exit(EXIT_FAILURE);
 	}
 #endif /* #ifdef USING_VALGRIND */
@@ -91,18 +91,18 @@ void *xmalloc(size_t size)
 #ifdef __unix
 		switch(errno) {
 			case ENOMEM:
-				perror("Error allocating memory ");
+				log_message(LOG_ERROR, "Error allocating memory: %s", strerror(errno));
 				if(count++ < MAX_RETRIES_ALLOC) {
-					fputs("Retrying in 100ms\n", stderr);
+					log_message(LOG_ERROR, "Retrying in 100ms");
 					usleep(100);
 				} else {
-					fprintf(stderr, "Giving up after %d tries\n", MAX_RETRIES_ALLOC);
+					log_message(LOG_FATAL, "Giving up after %d tries", MAX_RETRIES_ALLOC);
 					exit(EXIT_FAILURE);
 				}
 				break;
 			default:
 #endif /* #ifdef __unix */
-				perror("Error allocating memory ");
+				log_message(LOG_FATAL, "Error allocating memory: %s", strerror(errno));
 				exit(EXIT_FAILURE);
 #ifdef __unix
 		}
@@ -130,18 +130,18 @@ void *xcalloc(size_t nmemb, size_t size)
 #ifdef __unix
 		switch(errno) {
 			case ENOMEM:
-				perror("Error allocating memory ");
+				log_message(LOG_ERROR, "Error allocating memory: %s", strerror(errno));
 				if(count++ < MAX_RETRIES_ALLOC) {
-					fputs("Retrying in 100ms\n", stderr);
+					log_message(LOG_ERROR, "Retrying in 100ms");
 					usleep(100);
 				} else {
-					fprintf(stderr, "Giving up after %d tries\n", MAX_RETRIES_ALLOC);
+					log_message(LOG_FATAL, "Giving up after %d tries", MAX_RETRIES_ALLOC);
 					exit(EXIT_FAILURE);
 				}
 				break;
 			default:
 #endif /* #ifdef __unix */
-				perror("Error allocating memory ");
+				log_message(LOG_FATAL, "Error allocating memory: %s", strerror(errno));
 				exit(EXIT_FAILURE);
 #ifdef __unix
 		}
@@ -169,18 +169,18 @@ char *xstrdup(const char *str)
 #ifdef __unix
 		switch(errno) {
 			case ENOMEM:
-				perror("Error allocating memory ");
+				log_message(LOG_ERROR, "Error allocating memory: %s", strerror(errno));
 				if(count++ < MAX_RETRIES_ALLOC) {
-					fputs("Retrying in 100ms\n", stderr);
+					log_message(LOG_ERROR, "Retrying in 100ms");
 					usleep(100);
 				} else {
-					fprintf(stderr, "Giving up after %d tries\n", MAX_RETRIES_ALLOC);
+					log_message(LOG_FATAL, "Giving up after %d tries", MAX_RETRIES_ALLOC);
 					exit(EXIT_FAILURE);
 				}
 				break;
 			default:
 #endif /* #ifdef __unix */
-				perror("Error allocating memory ");
+				log_message(LOG_FATAL, "Error allocating memory: %s", strerror(errno));
 				exit(EXIT_FAILURE);
 #ifdef __unix
 		}
@@ -207,18 +207,18 @@ void *xrealloc(void *ptr, size_t size)
 #ifdef __unix
 		switch(errno) {
 			case ENOMEM:
-				perror("Error allocating memory ");
+				log_message(LOG_ERROR, "Error allocating memory: %s", strerror(errno));
 				if(count++ < MAX_RETRIES_ALLOC) {
-					fputs("Retrying in 100ms\n", stderr);
+					log_message(LOG_ERROR, "Retrying in 100ms");
 					usleep(100);
 				} else {
-					fprintf(stderr, "Giving up after %d tries\n", MAX_RETRIES_ALLOC);
+					log_message(LOG_FATAL, "Giving up after %d tries", MAX_RETRIES_ALLOC);
 					exit(EXIT_FAILURE);
 				}
 				break;
 			default:
 #endif /* #ifdef __unix */
-				perror("Error allocating memory ");
+				log_message(LOG_FATAL, "Error allocating memory: %s", strerror(errno));
 				exit(EXIT_FAILURE);
 #ifdef __unix
 		}
@@ -246,23 +246,22 @@ FILE *xfopen(const char *path, const char *mode)
 #ifdef __unix
 		switch(errno) {
 			case ENOMEM:
-				perror("Error opening file ");
+				log_message(LOG_ERROR, "Error opening file: %s", strerror(errno));
 				if(count++ < MAX_RETRIES_OPEN) {
-					fputs("Retrying in 100ms\n", stderr);
+					log_message(LOG_ERROR, "Retrying in 100ms");
 					usleep(100);
 				} else {
-					fprintf(stderr, "Giving up after %d tries\n", MAX_RETRIES_OPEN);
+					log_message(LOG_FATAL, "Giving up after %d tries", MAX_RETRIES_OPEN);
 					exit(EXIT_FAILURE);
 				}
 				break;
 			case EINTR:
-				perror("Error opening file ");
-				fputs("Retrying\n", stderr);
+				log_message(LOG_ERROR, "Error opening file: %s\nRetrying", strerror(errno));
 				count++;
 				break;
 			default:
 #endif /* #ifdef __unix */
-				perror("Error opening file ");
+				log_message(LOG_FATAL, "Error opening file: %s", strerror(errno));
 				exit(EXIT_FAILURE);
 #ifdef __unix
 		}
@@ -284,23 +283,22 @@ FILE *xfdopen(int fd, const char *mode)
 #ifdef __unix
 		switch(errno) {
 			case ENOMEM:
-				perror("Error opening file ");
+				log_message(LOG_ERROR, "Error opening file: %s", strerror(errno));
 				if(count++ < MAX_RETRIES_OPEN) {
-					fputs("Retrying in 100ms\n", stderr);
+					log_message(LOG_ERROR, "Retrying in 100ms");
 					usleep(100);
 				} else {
-					fprintf(stderr, "Giving up after %d tries\n", MAX_RETRIES_OPEN);
+					log_message(LOG_FATAL, "Giving up after %d tries", MAX_RETRIES_OPEN);
 					exit(EXIT_FAILURE);
 				}
 				break;
 			case EINTR:
-				perror("Error opening file ");
-				fputs("Retrying\n", stderr);
+				log_message(LOG_ERROR, "Error opening file: %s\nRetrying", strerror(errno));
 				count++;
 				break;
 			default:
 #endif /* #ifdef __unix */
-				perror("Error opening file ");
+				log_message(LOG_FATAL, "Error opening file: %s", strerror(errno));
 				exit(EXIT_FAILURE);
 #ifdef __unix
 		}
@@ -321,12 +319,12 @@ int xopen(const char *path, int flags)
 			break;
 		switch(errno) {
 			case ENOMEM:
-				perror("Error opening file ");
+				log_message(LOG_ERROR, "Error opening file: %s", strerror(errno));
 				if(count++ < MAX_RETRIES_OPEN) {
-					fputs("Retrying in 100ms\n", stderr);
+					log_message(LOG_ERROR, "Retrying in 100ms");
 					usleep(100);
 				} else {
-					fprintf(stderr, "Giving up after %d tries\n", MAX_RETRIES_OPEN);
+					log_message(LOG_FATAL, "Giving up after %d tries", MAX_RETRIES_OPEN);
 					exit(EXIT_FAILURE);
 				}
 				break;
@@ -335,12 +333,11 @@ int xopen(const char *path, int flags)
 				flags &= ~O_DIRECT;
 #endif /* #ifdef _GNU_SOURCE */
 			case EINTR:
-				perror("Error opening file ");
-				fputs("Retrying\n", stderr);
+				log_message(LOG_ERROR, "Error opening file: %s\nRetrying", strerror(errno));
 				count++;
 				break;
 			default:
-				perror("Error opening file ");
+				log_message(LOG_FATAL, "Error allocating memory: %s", strerror(errno));
 				exit(EXIT_FAILURE);
 		}
 	} while(1);
@@ -960,7 +957,7 @@ int is_dir(char *path)
 	struct stat buf;
 
 	if(lstat(path, &buf) != 0) {
-		perror("Error statting file ");
+		log_message(LOG_ERROR, "Error statting file: %s", strerror(errno));
 		return -1;
 	} else
 		return S_ISDIR(buf.st_mode);
@@ -1043,15 +1040,15 @@ int connect_to(char *server_name, unsigned port)
 	sockfd = socket(AF_INET, SOCK_STREAM, 0);
 	snprintf(port_buff, 11, "%u", port);
 	if(sockfd == -1) {
-		fprintf(stderr, "Error creating socket: %s\n", strerror(errno));
+		log_message(LOG_ERROR, "Error creating socket: %s", strerror(errno));
 		sockfd = CONNECT_ERROR;
 	} else if(getaddrinfo(server_name, port_buff, NULL, &adresses) != 0) {
 		/* DNS resolution. getaddrinfo creates a linked list (pointed to by adresses),
 		 * 1 element == 1 IP Address. Function IPv6 compatible. */
-		fprintf(stderr, "Unable to resolve '%s' to a valid IP address\n", server_name);
+		log_message(LOG_ERROR, "Unable to resolve '%s' to a valid IP address", server_name);
 		sockfd = CONNECT_ERROR;
 	} else {
-		fprintf(stderr, "DNS lookup succesful\n");
+		log_message(LOG_INFO, "DNS lookup succesful");
 		iterator = adresses;
 		// Iterate over linked list until we connect successfully or we run out of addresses.
 		while(connect(sockfd, iterator->ai_addr, (socklen_t) sizeof *iterator->ai_addr)
@@ -1063,7 +1060,7 @@ int connect_to(char *server_name, unsigned port)
 			}
 		}
 		if(iterator != NULL)
-			fprintf(stderr, "Connection established with %s (%s:%d)\n", server_name,
+			log_message(LOG_INFO, "Connection established with %s (%s:%d)", server_name,
 					inet_ntop(iterator->ai_family,
 						&((struct sockaddr_in*) iterator->ai_addr)->sin_addr,
 						ip_addr, sizeof ip_addr),
@@ -1086,21 +1083,21 @@ int create_server(unsigned port)
 
 	sockfd = socket(AF_INET, SOCK_STREAM, 0);
 	if(sockfd == -1) {
-		fprintf(stderr, "Error creating socket: %s\n", strerror(errno));
+		log_message(LOG_ERROR, "Error creating socket: %s", strerror(errno));
 		sockfd = CONNECT_ERROR;
 	} else {
 		if(setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &queue, sizeof queue) != 0)
-			fprintf(stderr, "Error setting socket option SO_REUSEADDR: %s\n", strerror(errno));
+			log_message(LOG_ERROR, "Error setting socket option SO_REUSEADDR: %s", strerror(errno));
 		/* print error message but keep on going. Failing here will not prevent program from
 		 * working correctly */
 		queue = SOMAXCONN;
 		if(bind(sockfd, (struct sockaddr*) &config, sizeof config) == CONNECT_ERROR || 
 				listen(sockfd, queue) != 0) {
 			shutdown(sockfd, SHUT_RDWR);
-			fprintf(stderr, "Error binding server %d: %s\n", port, strerror(errno));
+			log_message(LOG_ERROR, "Error binding server %d: %s", port, strerror(errno));
 			sockfd = CONNECT_ERROR;
 		} else
-			fprintf(stderr, "Server initialized on port %u\n", port);
+			log_message(LOG_INFO, "Server initialized on port %u", port);
 	}
 	return sockfd;
 }
@@ -1114,11 +1111,11 @@ int get_single_client(int server_socket)
 
 	client_fd = accept(server_socket, (struct sockaddr*) &client_config, &size);
 	if(client_fd != CONNECT_ERROR)
-		fprintf(stderr, "Connection established to %s:%u\n",
+		log_message(LOG_INFO, "Connection established to %s:%u",
 			inet_ntop(AF_INET, &client_config.sin_addr, buffer, INET6_ADDRSTRLEN),
 			ntohs(client_config.sin_port));
 	else
-		fprintf(stderr, "Error establishing connection: %s\n", strerror(errno));
+		log_message(LOG_ERROR, "Error establishing connection: %s", strerror(errno));
 
 	return client_fd;
 }
@@ -1160,7 +1157,7 @@ int turn_echoing_off(void)
 
 	if(tcgetattr(STDIN_FILENO, &term) != 0) {
 #ifdef INTERNAL_ERROR_HANDLING
-		perror("Error manipulating terminal ");
+		log_message(LOG_FATAL, "Error manipulating terminal: %s", strerror(errno));
 		exit(EXIT_FAILURE);
 #else
 		return -1;
@@ -1169,7 +1166,7 @@ int turn_echoing_off(void)
 	term.c_lflag &= ~ECHO;
 	if(tcsetattr(STDIN_FILENO, TCSAFLUSH, &term) != 0) {
 #ifdef INTERNAL_ERROR_HANDLING
-		perror("Error manipulating terminal ");
+		log_message(LOG_FATAL, "Error manipulating terminal: %s", strerror(errno));
 		exit(EXIT_FAILURE);
 #else
 		return -1;
@@ -1184,7 +1181,7 @@ int turn_echoing_on(void)
 
 	if(tcgetattr(STDIN_FILENO, &term) != 0) {
 #ifdef INTERNAL_ERROR_HANDLING
-		perror("Error manipulating terminal ");
+		log_message(LOG_FATAL, "Error manipulating terminal: %s", strerror(errno));
 		exit(EXIT_FAILURE);
 #else
 		return -1;
@@ -1193,7 +1190,7 @@ int turn_echoing_on(void)
 	term.c_lflag |= ECHO;
 	if(tcsetattr(STDIN_FILENO, TCSAFLUSH, &term) != 0) {
 #ifdef INTERNAL_ERROR_HANDLING
-		perror("Error manipulating terminal ");
+		log_message(LOG_FATAL, "Error manipulating terminal: %s", strerror(errno));
 		exit(EXIT_FAILURE);
 #else
 		return -1;
@@ -1208,7 +1205,7 @@ int instant_getchar(void)
 
 	if(tcgetattr(STDIN_FILENO, &term) != 0) {
 #ifdef INTERNAL_ERROR_HANDLING
-		perror("Error manipulating terminal ");
+		log_message(LOG_FATAL, "Error manipulating terminal: %s", strerror(errno));
 		exit(EXIT_FAILURE);
 #else
 		return -1;
@@ -1220,7 +1217,7 @@ int instant_getchar(void)
 
 	if(tcsetattr(STDIN_FILENO, TCSAFLUSH, &term) != 0) {
 #ifdef INTERNAL_ERROR_HANDLING
-		perror("Error manipulating terminal ");
+		log_message(LOG_FATAL, "Error manipulating terminal: %s", strerror(errno));
 		exit(EXIT_FAILURE);
 #else
 		return -1;
@@ -1235,7 +1232,7 @@ int normal_getchar(void)
 
 	if(tcgetattr(STDIN_FILENO, &term) != 0) {
 #ifdef INTERNAL_ERROR_HANDLING
-		perror("Error manipulating terminal ");
+		log_message(LOG_FATAL, "Error manipulating terminal: %s", strerror(errno));
 		exit(EXIT_FAILURE);
 #else
 		return -1;
@@ -1244,7 +1241,7 @@ int normal_getchar(void)
 	term.c_lflag |= ICANON;
 	if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &term) != 0) {
 #ifdef INTERNAL_ERROR_HANDLING
-		perror("Error manipulating terminal ");
+		log_message(LOG_FATAL, "Error manipulating terminal: %s", strerror(errno));
 		exit(EXIT_FAILURE);
 #else
 		return -1;
@@ -1263,10 +1260,10 @@ pthread_t launch_thread(void* (*start_routine)(void*), void *arg, int detach)
 {
 	pthread_t th;
 	if(pthread_create(&th, NULL, start_routine, arg) != 0) {
-		log_message(LOG_ERROR, "Error creating thread!\n");
+		log_message(LOG_ERROR, "Error creating thread: %s", strerror(errno));
 		th = 0;
 	} else if(detach && pthread_detach(th) != 0)
-		log_message(LOG_ERROR, "Error detaching thread\n");
+		log_message(LOG_ERROR, "Error detaching thread: %s", strerror(errno));
 	return th;
 }
 
@@ -1276,7 +1273,7 @@ pthread_t xlaunch_thread(void *(*start_routine)(void*), void *arg, int detach)
 {
 	pthread_t th = launch_thread(start_routine, arg, detach);
 	if(th == 0) {
-		perror("Thread not created");
+		log_message(LOG_FATAL, "Thread not created: %s", strerror(errno));
 		exit(EXIT_FAILURE);
 	}
 	return th;
@@ -1287,7 +1284,7 @@ void *xpthread_join(pthread_t thread)
 	void *retval;
 
 	if(pthread_join(thread, &retval) != 0) {
-		perror("Error joining threads");
+		log_message(LOG_FATAL, "Error joining threads: %s", strerror(errno));
 		exit(EXIT_FAILURE);
 	}
 	return retval;
@@ -1504,7 +1501,7 @@ void register_signal_handler(int signum, void (*sighandler)(int))
 	new_sigaction.sa_handler = sighandler;
 	if(sigaction(signum, &new_sigaction, (struct sigaction*) NULL) != 0) {
 #ifndef INTERNAL_ERROR_HANDLING
-		perror("Error registering signal handler ");
+		log_message(LOG_FATAL, "Error registering signal handler: %s", strerror(errno));
 		exit(EXIT_FAILURE);
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
 	}
@@ -1514,7 +1511,7 @@ void register_signal_handler(int signum, void (*sighandler)(int))
 http://www.emoticode.net/c/an-example-log-function-using-different-log-levels-and-variadic-macros.html
  */
 static log_level_t __g_loglevel = LOG_DEBUG;
-static FILE *__g_loghandle = NULL;
+static FILE *__g_loghandle = stderr;
 
 void init_log(FILE *stream, log_level_t loglevel)
 {
