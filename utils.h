@@ -44,6 +44,8 @@
 #define ENABLE_BITSET
 /* directory navigation functions */
 #define ENABLE_FILESYSTEM
+/* networking related functions */
+#define ENABLE_NETWORKING
 /* Terminal manipulation functions, as well as color text printing */
 /* Will not work on windows machine */
 #define ENABLE_TERMIOS_MANIPULATION
@@ -57,7 +59,7 @@
  * with caution */
 /*#define ENABLE_MEMPOOL */
 /* miscellaneous functions */
-#define ENABLE_MISC
+//#define ENABLE_MISC
 
 /* calling init_alloc() as enabled by MANAGE_MEM causes of a 1-byte allocation.
  * Although the overhead associated with freeing that single byte isn't worth the effort,
@@ -384,6 +386,34 @@ char *make_path(const char *path, const char *filename);
 void *dirwalk(const char *path, void* (*func)(void* arg, char* path), void *arg);
 
 #endif /* #ifdef ENABLE_FILESYSTEM */
+
+
+
+/* -------------------- Networking functions -------------------- */
+#ifdef ENABLE_NETWORKING
+
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+
+#define CONNECT_ERROR		-1
+
+/* connect to server server_name running on port port. server_name can be a
+ * hostname or an IP address. Returns a file descriptor through which 
+ * communication with the server is possible, or CONNECT_ERROR in case
+ * of error */
+int connect_to(char *server_name, unsigned port);
+
+/* create a server listening on port port. Returns a file descriptor to a socket
+ * ready to accept() clients, or CONNECT_ERROR in case of error */
+int create_server(unsigned port);
+
+/* accept() a client and return a file descriptor through which program can
+ * communicate with client, or CONNECT_ERROR in case of error */
+int get_single_client(int server_socket);
+
+#endif /* #ifdef ENABLE_NETWORKING */
 
 
 
