@@ -16,7 +16,8 @@ This "library" provides functions for:
   - memory pool management
   - configuration file management (coming soon)
   - logging
-  - misc
+  - networking
+  - and more!
 
 The different functions are grouped into sections, which can each be "activated" or "deactivated" individually. This is done with a series of #define'd constants that one can comment out to deactivate the relevant section. This results in code that can be messy at times, but reducing the executable file size is greatly facilited when using static linking.
 
