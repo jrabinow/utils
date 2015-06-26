@@ -34,7 +34,7 @@ void init_alloc(void)
 	int count = 0;
 	do {
 		heap_bottom = heap_top = malloc(1);
-		if(heap_bottom == NULL)
+		if(unlikely(heap_bottom == NULL))
 			switch(errno) {
 				case ENOMEM:
 					log_message(LOG_ERROR, "Error allocating memory: %s", strerror(errno));
@@ -86,7 +86,7 @@ void *xmalloc(size_t size)
 
 	do {
 		ptr = malloc(size);
-		if(ptr != NULL)
+		if(likely(ptr != NULL))
 			break;
 #ifdef __unix
 		switch(errno) {
@@ -125,7 +125,7 @@ void *xcalloc(size_t nmemb, size_t size)
 
 	do {
 		ptr = calloc(nmemb, size);
-		if(ptr != NULL)
+		if(likely(ptr != NULL))
 			break;
 #ifdef __unix
 		switch(errno) {
@@ -202,7 +202,7 @@ void *xrealloc(void *ptr, size_t size)
 
 	do {
 		ptr = realloc(ptr, size);
-		if(ptr != NULL)
+		if(likely(ptr != NULL))
 			break;
 #ifdef __unix
 		switch(errno) {
@@ -308,7 +308,7 @@ FILE *xfdopen(int fd, const char *mode)
 	return f;
 }
 
-#ifndef __unix
+#ifdef __unix
 int xopen(const char *path, int flags)
 {
 	int fd, count = 0;
@@ -344,7 +344,7 @@ int xopen(const char *path, int flags)
 
 	return fd;
 }
-#endif /* ifndef __unix */
+#endif /* ifdef __unix */
 
 #endif /* #if defined(ENABLE_ERROR_HANDLING) || defined(INTERNAL_ERROR_HANDLING) */
 
@@ -1050,16 +1050,16 @@ int connect_to(char *server_name, unsigned port)
 	} else {
 		log_message(LOG_INFO, "DNS lookup succesful");
 		iterator = adresses;
-		// Iterate over linked list until we connect successfully or we run out of addresses.
+		/* Iterate over linked list until we connect successfully or we run out of addresses. */
 		while(connect(sockfd, iterator->ai_addr, (socklen_t) sizeof *iterator->ai_addr)
 				== CONNECT_ERROR) {
 			iterator = iterator->ai_next;
-			if(iterator == NULL) {
+			if(unlikely(iterator == NULL)) {
 				sockfd = CONNECT_ERROR;
 				break;
 			}
 		}
-		if(iterator != NULL)
+		if(likely(iterator != NULL))
 			log_message(LOG_INFO, "Connection established with %s (%s:%d)", server_name,
 					inet_ntop(iterator->ai_family,
 						&((struct sockaddr_in*) iterator->ai_addr)->sin_addr,
@@ -1091,7 +1091,7 @@ int create_server(unsigned port)
 		/* print error message but keep on going. Failing here will not prevent program from
 		 * working correctly */
 		queue = SOMAXCONN;
-		if(bind(sockfd, (struct sockaddr*) &config, sizeof config) == CONNECT_ERROR || 
+		if(bind(sockfd, (struct sockaddr*) &config, sizeof config) == CONNECT_ERROR ||
 				listen(sockfd, queue) != 0) {
 			shutdown(sockfd, SHUT_RDWR);
 			log_message(LOG_ERROR, "Error binding server %d: %s", port, strerror(errno));
@@ -1307,7 +1307,7 @@ void mempool_create(struct mempool *mp, size_t size, size_t nmemb)
 #else
 	mp->mem = malloc((sizeof(unsigned) + size) * nmemb);
 	mp->ptrs = malloc(sizeof(unsigned*) * nmemb);
-	if(mp->ptrs == NULL || mp->mem == NULL) {
+	if(unlikely(mp->ptrs == NULL || mp->mem == NULL)) {
 		free(mp->mem);
 		free(mp->ptrs);
 		mp->mem = NULL;
@@ -1374,6 +1374,8 @@ void mempool_delete(struct mempool *mp)
 
 
 /* -------------------- Config file -------------------- */
+
+#if 0 /* TODO */
 #ifdef ENABLE_CONFIG_FILE
 #define CFG_FILE_START_SIZE 8
 Config_File create_config_file(const char *path)
@@ -1385,15 +1387,173 @@ Config_File create_config_file(const char *path)
 	cfg_file. = (Cfg_Var*) xmalloc(CFG_FILE_START_SIZE * sizeof(Cfg_Var));
 #else
 	cfg_file.file = fopen(path, "w");
-	if(cfg_file.file == NULL) {
+	if(cfg_file.file == NULL)
 	cfg_file. = (Cfg_Var*) malloc(CFG_FILE_START_SIZE * sizeof(Cfg_Var));
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
 
 	return cfg_file;
 }
 #endif /* #ifdef ENABLE_CONFIG_FILE */
+#endif
 
 
+/* -------------------- High-level mmap() -------------------- */
+#if defined(ENABLE_MMAP) && defined(__unix)
+
+Mmap *fmap(const char *path, const char *mode)
+{
+	int prot = PROT_NONE, i, flags = 0;
+	off_t offset;
+#ifdef INTERNAL_ERROR_HANDLING
+	Mmap *f = (Mmap*) xmalloc(sizeof(Mmap));
+#else
+	Mmap *f = (Mmap*) malloc(sizeof(Mmap));
+	if(unlikely(f == NULL))
+		return NULL;
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
+
+	for(i = 0; mode[i] != '\0'; i++)
+		switch(mode[i]) {
+			case 'r':
+				prot |= PROT_READ;
+				if(prot & PROT_WRITE)
+					flags = O_RDWR | O_CREAT | O_CLOEXEC;
+				else
+					flags = O_RDONLY | O_CLOEXEC;
+				break;
+			case 'w':
+				prot |= PROT_WRITE;
+				if(prot & PROT_READ)
+					flags = O_RDWR | O_CREAT | O_CLOEXEC;
+				else
+					flags = O_WRONLY | O_CREAT | O_CLOEXEC;
+				break;
+			case 'x':
+				prot |= PROT_EXEC;
+				break;
+			default:
+				free(f);
+				return NULL;
+		}
+#ifdef INTERNAL_ERROR_HANDLING
+	i = xopen(path, flags);
+	if(unlikely((offset = lseek(i, 0, SEEK_END)) == -1)) {
+		perror("Error obtaining file size");
+		exit(EXIT_FAILURE);
+	}
+	if(unlikely(lseek(i, 0, SEEK_SET) == -1)) {
+		perror("Error obtaining file size");
+		exit(EXIT_FAILURE);
+	}
+	if(unlikely((f->ptr = (char*) mmap(NULL, offset,
+		prot, MAP_PRIVATE, i, (off_t) 0)) == MAP_FAILED)) {
+		perror("Error loading file into memory");
+		exit(EXIT_FAILURE);
+	}
+#else
+	i = open(path, flags);
+	if(unlikely(i == -1)) {
+		free(f);
+		return NULL;
+	}
+	if(unlikely((offset = lseek(i, 0, SEEK_END)) == -1)) {
+		close(i);
+		free(f);
+		return NULL;
+	}
+	if(unlikely(lseek(i, 0, SEEK_SET) == -1)) {
+		close(i);
+		free(f);
+		return NULL;
+	}
+	if(unlikely((f->ptr = (char*) mmap(NULL, offset,
+		prot, MAP_PRIVATE, i, (off_t) 0)) == MAP_FAILED)) {
+		close(i);
+		free(f);
+		return NULL;
+	}
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
+	f->endptr = f->offset = f->ptr;
+	f->endptr += offset;
+	close(i);
+
+	return f;
+}
+
+size_t mread(void *ptr, size_t size, size_t nmemb, Mmap *f)
+{
+	size_t rsize = size * nmemb;
+
+	if(f->offset + size * nmemb > f->endptr)
+		rsize = f->endptr - f->offset;
+	/* use of memmove instead of memcpy is intentional.
+	 * We can now 'shift' data in a file */
+	memmove(ptr, f->offset, rsize);
+	f->offset += rsize;
+
+	return rsize;
+}
+
+size_t mwrite(void *ptr, size_t size, size_t nmemb, Mmap *f)
+{
+	size_t wsize = size * nmemb;
+
+	if(f->offset + size * nmemb > f->endptr)
+		wsize = f->endptr - f->offset;
+	memmove(f->offset, ptr, wsize);
+	f->offset += wsize;
+
+	return wsize;
+}
+
+/* TODO: determine by how much to increment f->offset */
+#if 0
+int mscanf(Mmap *f, const char *fmt, ...)
+{
+	va_list ap;
+	int ret;
+
+	va_start(ap, fmt);
+	ret = vsscanf(f->offset, fmt, ap);
+	va_end(ap);
+
+	return ret;
+}
+#endif
+
+int mprintf(Mmap *f, const char *fmt, ...)
+{
+	va_list ap;
+	int ret;
+
+	va_start(ap, fmt);
+	ret = vsprintf(f->offset, fmt, ap);
+	f->offset += ret;
+	va_end(ap);
+
+	return ret;
+}
+
+int mnprintf(Mmap *f, size_t size, const char *fmt, ...)
+{
+	va_list ap;
+	int ret;
+
+	va_start(ap, fmt);
+	ret = vsnprintf(f->offset, size, fmt, ap);
+	f->offset += ret;
+	va_end(ap);
+
+	return ret;
+}
+
+void unmap_file(Mmap *f)
+{
+	munmap(f->ptr, (size_t) (f->endptr - f->ptr));
+	free(f);
+}
+
+#endif /* #if defined(ENABLE_MMAP) && defined(__unix) */
 
 /* -------------------- Misc functions -------------------- */
 #ifdef ENABLE_MISC
@@ -1433,20 +1593,22 @@ char *itoa(int n, char *buffer)
 	return buffer;
 }
 
-int hexatoi(const char *hex)
+unsigned hexatoi(const char *hex)
 {
-	size_t size;
-	unsigned res, pow;
+	unsigned res = 0;
 
-	for(size = 0; hex[size] != '\0'; size++);
+	if(*hex == '0' && *(hex + 1) == 'x')
+		hex += 2;
 
-	for(pow = 1, res = 0, size--; size > 0; pow <<= 4, size--)
-		res += pow * (hex[size] >= 'a' ? hex[size] - 87 : (hex[size] >= 'A' ? hex[size] - 55 : hex[size] - '0'));
-
-	if(hex[0] == '-')
-		res = 0 - res;
-	else
-		res += pow * (hex[0] >= 'a' ? hex[0] - 87 : (hex[0] >= 'A' ? hex[0] - 55 : hex[0] - '0'));
+	for(; *hex != '\0'; hex++)
+		if('0' <= *hex && *hex <= '9')
+			res = (res << 4) + *hex - '0';
+		else if('A' <= *hex && *hex <= 'Z')
+			res = (res << 4) + *hex - 'A' + 10;
+		else if('a' <= *hex && *hex <= 'z')
+			res = (res << 4) + *hex - 'a' + 10;
+		else
+			break;
 	return res;
 }
 
@@ -1511,7 +1673,7 @@ void register_signal_handler(int signum, void (*sighandler)(int))
 http://www.emoticode.net/c/an-example-log-function-using-different-log-levels-and-variadic-macros.html
  */
 static log_level_t __g_loglevel = LOG_DEBUG;
-static FILE *__g_loghandle = stderr;
+static FILE *__g_loghandle = NULL;
 
 void init_log(FILE *stream, log_level_t loglevel)
 {
@@ -1528,8 +1690,10 @@ void log_message(log_level_t level, const char *format, ...)
 #if defined(ENABLE_TERMIOS_MANIPULATION) && defined(__unix)
 	Color color = WHITE, bgcolor = BLACK;
 #endif	/* #if defined(ENABLE_TERMIOS_MANIPULATION) && defined(__unix) */
+	if(unlikely(__g_loghandle == NULL))
+		__g_loghandle = stderr;
 
-	if(__g_loghandle != NULL && level >= __g_loglevel) {
+	if(level >= __g_loglevel) {
 		va_start(ap, format);
 		vsnprintf(buffer, 255, format, ap);
 		va_end(ap);
@@ -1572,7 +1736,7 @@ void log_message(log_level_t level, const char *format, ...)
 	}
 }
 
-void failwith(char *errmsg)
+void failwith(const char *errmsg)
 {
 	fputs(errmsg, stderr);
 	fputc('\n', stderr);

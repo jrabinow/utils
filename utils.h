@@ -54,12 +54,14 @@
 /* Memory pool, to cache heap memory and avoid having to call malloc. Idea is that
  * we often ask for same memory sizes (nodes in a linked list or tree, data structures
  * each requiring the same amount of memory...). This memory pool reduces overhead caused
- * by memory allocation
+ * by memory allocation and enormously improves memory locality.
  * This implementation is highly experimental and suffers from a few limitations. Proceed
  * with caution */
 /*#define ENABLE_MEMPOOL */
+/* High-level mmap */
+#define ENABLE_MMAP
 /* miscellaneous functions */
-//#define ENABLE_MISC
+#define ENABLE_MISC
 
 /* calling init_alloc() as enabled by MANAGE_MEM causes of a 1-byte allocation.
  * Although the overhead associated with freeing that single byte isn't worth the effort,
@@ -89,6 +91,14 @@
 # endif
 #endif
 
+#ifdef __GNUC__
+# define likely(x)	__builtin_expect(!!(x), 1)
+# define unlikely(x)	__builtin_expect(!!(x), 0)
+#else
+# define likely(x)	(x)
+# define unlikely(x)	(x)
+#endif
+
 extern int errno;
 
 #include <stdint.h>
@@ -101,6 +111,7 @@ extern int errno;
 #ifdef ENABLE_BOOL_TYPE
 # define BOOL_FALSE false
 # define BOOL_TRUE true
+# define BOOL_TYPE bool
 # ifdef C99
 #  include <stdbool.h>
 # else
@@ -109,6 +120,7 @@ extern int errno;
 #else
 # define BOOL_FALSE 0
 # define BOOL_TRUE 1
+# define BOOL_TYPE int
 #endif /* #ifdef ENABLE_BOOL_TYPE */
 
 #if defined(MANAGE_MEM) || defined(ENABLE_ERROR_HANDLING)
@@ -134,12 +146,7 @@ void init_alloc(void);
  * if(is_allocated(myptr))
  *	free(myptr);
  */
-#ifdef ENABLE_BOOL_TYPE
-bool
-#else
-int
-#endif /* #ifdef ENABLE_BOOL_TYPE */
-is_allocated(void *ptr);
+BOOL_TYPE is_allocated(void *ptr);
 
 /* if you're too lazy to do like in the previous example, this function does it for you */
 void xfree(void *ptr);
@@ -197,43 +204,18 @@ int xopen(const char *path, int flags);
 
 #include <ctype.h>
 /* returns true if isdigit() returns true for all chars in str, false otherwise */
-#ifdef ENABLE_BOOL_TYPE
-bool
-#else
-int
-#endif /* #ifdef ENABLE_BOOL_TYPE */
-is_valid_int(const char *str);
+BOOL_TYPE is_valid_int(const char *str);
 
 /* Same idea as is_valid_int, except checks for float (allows for a single '.' in str) */
-#ifdef ENABLE_BOOL_TYPE
-bool
-#else
-int
-#endif /* #ifdef ENABLE_BOOL_TYPE */
-is_valid_float(const char *str);
+BOOL_TYPE is_valid_float(const char *str);
 
-#ifdef ENABLE_BOOL_TYPE
-bool
-#else
-int
-#endif /* #ifdef ENABLE_BOOL_TYPE */
-is_valid_hex(const char *str);
+BOOL_TYPE is_valid_hex(const char *str);
 
 /* returns true if str starts with prefix */
-#ifdef ENABLE_BOOL_TYPE
-bool
-#else
-int
-#endif /* #ifdef ENABLE_BOOL_TYPE */
-startswith(const char *str, const char *prefix);
+BOOL_TYPE startswith(const char *str, const char *prefix);
 
 /* returns true if str ends with suffix */
-#ifdef ENABLE_BOOL_TYPE
-bool
-#else
-int
-#endif /* #ifdef ENABLE_BOOL_TYPE */
-endswith(const char *str, const char *suffix);
+BOOL_TYPE endswith(const char *str, const char *suffix);
 
 /* sets str to lower case */
 void str_tolower(char *str);
@@ -509,6 +491,31 @@ void mempool_delete(struct mempool *mp);
 
 
 
+/* -------------------- High-level mmap() -------------------- */
+#if defined(ENABLE_MMAP) && defined(__unix)
+
+#include <sys/mman.h>
+
+typedef struct {
+	  char *ptr, *offset, *endptr;
+} Mmap;
+
+/* Map file to memory space. Mode can be any of the characters 'r', 'w' or 'x'
+ * in any order, or empty string for PROT_NONE (see mmap(2) */
+Mmap *fmap(const char *path, const char *mode);
+
+size_t mread(void *ptr, size_t size, size_t nmemb, Mmap *f);
+size_t mwrite(void *ptr, size_t size, size_t nmemb, Mmap *f);
+int mprintf(Mmap *f, const char *fmt, ...);
+int mnprintf(Mmap *f, size_t size, const char *fmt, ...);
+
+/* Unmap and close resources */
+void unmap_file(Mmap *f);
+
+#endif /* #if defined(ENABLE_MMAP) && defined(__unix) */
+
+
+
 /* -------------------- Misc functions -------------------- */
 #ifdef ENABLE_MISC
 
@@ -534,7 +541,7 @@ Weekday get_day_of_week(int day, int month, int year);
 char *itoa(int val, char *buffer);
 
 /* convert from hexadecimal format string to integer */
-int hexatoi(const char *hex);
+unsigned hexatoi(const char *hex);
 
 /* return greatest common divisor of u and v */
 unsigned int gcd(unsigned int u, unsigned int v);
@@ -570,10 +577,10 @@ void log_message(log_level_t level, const char *format, ... );
 
 /* prints errmsg to stderr and calls exit(). Functions previously registered with atexit()
  * will be called */
-void failwith(char *errmsg);
+void failwith(const char *errmsg);
 
 /* swap variables a and b. Both a and b must be of type TYPE */
-#define SWAP(a, b, TYPE)	{\
+#define SWAP(a, b, TYPE) {\
 	TYPE __tmp__ = a;\
 	a = b;\
 	b = __tmp__;\
