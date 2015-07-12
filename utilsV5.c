@@ -1400,9 +1400,10 @@ Config_File create_config_file(const char *path)
 /* -------------------- High-level mmap() -------------------- */
 #if defined(ENABLE_MMAP) && defined(__unix)
 
-Mmap *fmap(const char *path, const char *mode)
+Mmap *mopen(const char *path, const char *mode)
 {
-	int prot = PROT_NONE, i, flags = 0;
+	int prot = PROT_NONE, i, o_flags = 0;
+	int exec_flag = 0, flags = MAP_PRIVATE;
 	off_t offset;
 #ifdef INTERNAL_ERROR_HANDLING
 	Mmap *f = (Mmap*) xmalloc(sizeof(Mmap));
@@ -1417,26 +1418,38 @@ Mmap *fmap(const char *path, const char *mode)
 			case 'r':
 				prot |= PROT_READ;
 				if(prot & PROT_WRITE)
-					flags = O_RDWR | O_CREAT | O_CLOEXEC;
+					o_flags = O_RDWR | O_CREAT | O_CLOEXEC;
 				else
-					flags = O_RDONLY | O_CLOEXEC;
+					o_flags = O_RDONLY | O_CLOEXEC;
 				break;
 			case 'w':
 				prot |= PROT_WRITE;
 				if(prot & PROT_READ)
-					flags = O_RDWR | O_CREAT | O_CLOEXEC;
+					o_flags = O_RDWR | O_CREAT | O_CLOEXEC;
 				else
-					flags = O_WRONLY | O_CREAT | O_CLOEXEC;
+					o_flags = O_WRONLY | O_CREAT | O_CLOEXEC;
 				break;
 			case 'x':
-				prot |= PROT_EXEC;
+				exec_flag |= PROT_EXEC;
+				break;
+			case 'p':
+				flags = MAP_PRIVATE;
+				break;
+			case 's':
+				flags = MAP_SHARED;
 				break;
 			default:
+#ifdef INTERNAL_ERROR_HANDLING
+				log_message(LOG_FATAL, "Error: invalid mode");
+				exit(EXIT_FAILURE);
+#else
+				log_message(LOG_ERROR, "Error: invalid mode");
 				free(f);
 				return NULL;
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
 		}
 #ifdef INTERNAL_ERROR_HANDLING
-	i = xopen(path, flags);
+	i = xopen(path, o_flags);
 	if(unlikely((offset = lseek(i, 0, SEEK_END)) == -1)) {
 		perror("Error obtaining file size");
 		exit(EXIT_FAILURE);
@@ -1446,12 +1459,12 @@ Mmap *fmap(const char *path, const char *mode)
 		exit(EXIT_FAILURE);
 	}
 	if(unlikely((f->ptr = (char*) mmap(NULL, offset,
-		prot, MAP_PRIVATE, i, (off_t) 0)) == MAP_FAILED)) {
+		prot, flags, i, (off_t) 0)) == MAP_FAILED)) {
 		perror("Error loading file into memory");
 		exit(EXIT_FAILURE);
 	}
 #else
-	i = open(path, flags);
+	i = open(path, o_flags);
 	if(unlikely(i == -1)) {
 		free(f);
 		return NULL;
@@ -1467,7 +1480,7 @@ Mmap *fmap(const char *path, const char *mode)
 		return NULL;
 	}
 	if(unlikely((f->ptr = (char*) mmap(NULL, offset,
-		prot, MAP_PRIVATE, i, (off_t) 0)) == MAP_FAILED)) {
+		prot | exec_flag, flags, i, (off_t) 0)) == MAP_FAILED)) {
 		close(i);
 		free(f);
 		return NULL;
@@ -1643,6 +1656,22 @@ unsigned int gcd(unsigned int u, unsigned int v)
 	/* restore common factors of 2 */
 	return u << shift;
 }
+
+#ifdef C99
+inline int_fast32_t int_max(int a, int b)
+{
+	register int_fast32_t c = a - b;
+	register int_fast32_t k = (c >> 31) & 0x1;
+	return a - k * c;
+}
+
+inline int_fast32_t int_min(int a, int b)
+{
+	register int_fast32_t c = b - a;
+	register int_fast32_t k = (c >> 31) & 0x1;
+	return a + k * c;
+}
+#endif /* #ifdef C99 */
 
 void *initialize_vector(void *dest, const void *src, size_t size, size_t nmemb)
 {
