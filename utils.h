@@ -289,7 +289,7 @@ size_t split_str(const char *str, const char separator, char ***returnArray);
 size_t split_str_lite(char *str, const char separator, char ***returnArray);
 
 /* returns true if str1 and str2 are 2 the same strings. Helps make code more readable*/
-#define equals(str1, str2)	(strcmp(str1, str2) == 0)
+#define str_equals(str1, str2)	(strcmp(str1, str2) == 0)
 
 #endif /* #ifdef ENABLE_STRING_MANIPULATION */
 
@@ -501,8 +501,8 @@ typedef struct {
 } Mmap;
 
 /* Map file to memory space. Mode can be any of the characters 'r', 'w' or 'x'
- * in any order, or empty string for PROT_NONE (see mmap(2) */
-Mmap *fmap(const char *path, const char *mode);
+ * in any order, or empty string for PROT_NONE (see mmap(2) for details) */
+Mmap *mopen(const char *path, const char *mode);
 
 size_t mread(void *ptr, size_t size, size_t nmemb, Mmap *f);
 size_t mwrite(void *ptr, size_t size, size_t nmemb, Mmap *f);
@@ -545,6 +545,14 @@ unsigned hexatoi(const char *hex);
 
 /* return greatest common divisor of u and v */
 unsigned int gcd(unsigned int u, unsigned int v);
+
+#ifdef C99
+inline int_fast32_t int_max(int a, int b);
+inline int_fast32_t int_min(int a, int b);
+#else
+# define int_max(a, b) ((a) - ((((a) - (b)) >> 31) & 0x1) * ((a) - (b)))
+# define int_min(a, b) ((a) + ((((b) - (a)) >> 31) & 0x1) * ((b) - (a)))
+#endif
 
 /* Efficiently fill dest with contents of src. src is a single element of size size. dest is a
  * memory buffer of size size * nmemb
