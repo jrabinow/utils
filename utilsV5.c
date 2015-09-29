@@ -929,7 +929,7 @@ char *read_file_descriptor(int fd)
 
 bitset new_bitset(size_t size)
 {
-	size_t mem = size >> 3 + (size % 8 != 0);
+	size_t mem = (size >> 3) + (size % 8 != 0);
 
 	bitset b = (bitset) malloc(mem);
 	memset(b, 0, mem);
