@@ -324,8 +324,13 @@ char *read_file_descriptor(int fd);
 
 /* -------------------- BITSETTING -------------------- */
 #ifdef ENABLE_BITSET
+#include <malloc.h>
 
 typedef byte *bitset;
+
+bitset new_bitset(size_t size);
+
+#define free_bitset	free
 
 /* obtain bit at position pos from set array */
 int getbit(bitset set, int pos);
@@ -501,8 +506,8 @@ typedef struct {
 } Mmap;
 
 /* Map file to memory space. Mode can be any of the characters 'r', 'w' or 'x'
- * in any order, or empty string for PROT_NONE (see mmap(2) */
-Mmap *fmap(const char *path, const char *mode);
+ * in any order, or empty string for PROT_NONE (see mmap(2) for details) */
+Mmap *mopen(const char *path, const char *mode);
 
 size_t mread(void *ptr, size_t size, size_t nmemb, Mmap *f);
 size_t mwrite(void *ptr, size_t size, size_t nmemb, Mmap *f);
@@ -545,6 +550,26 @@ unsigned hexatoi(const char *hex);
 
 /* return greatest common divisor of u and v */
 unsigned int gcd(unsigned int u, unsigned int v);
+
+#ifdef C99
+inline int_fast32_t max(int a, int b)
+{
+	register int_fast32_t c = a - b;
+	register int_fast32_t k = (c >> 31) & 0x1;
+	return a - k * c;
+}
+
+inline int_fast32_t min(int a, int b)
+{
+	register int_fast32_t c = b - a;
+	register int_fast32_t k = (c >> 31) & 0x1;
+	return a + k * c;
+}
+
+#else
+# define max(a, b) ((a) - ((((a) - (b)) >> 31) & 0x1) * ((a) - (b)))
+# define min(a, b) ((a) + ((((b) - (a)) >> 31) & 0x1) * ((b) - (a)))
+#endif
 
 /* Efficiently fill dest with contents of src. src is a single element of size size. dest is a
  * memory buffer of size size * nmemb

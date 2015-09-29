@@ -927,25 +927,34 @@ char *read_file_descriptor(int fd)
 /* -------------------- BITSETTING -------------------- */
 #ifdef ENABLE_BITSET
 
+bitset new_bitset(size_t size)
+{
+	size_t mem = size >> 3 + (size % 8 != 0);
+
+	bitset b = (bitset) malloc(mem);
+	memset(b, 0, mem);
+	return b;
+}
+
 int getbit(bitset set, int pos)
 {
-	return (set[pos / 8] & (1 << pos % 8)) >> (pos % 8);
+	return (set[pos >> 3] >> (pos % 8)) & 1;
 }
 
 void setbit(bitset set, int pos)
 {
-	set[pos / 8] |= (1 << pos % 8);
+	set[pos >> 3] |= (1 << (pos % 8));
 }
 
 void unsetbit(bitset set, int pos)
 {
-	set[pos / 8] &= ~(1 << pos % 8);
+	set[pos >> 3] &= ~(1 << (pos % 8));
 }
 
 int togglebit(bitset set, int pos)
 {
-	set[pos / 8] ^= 1 << pos % 8;
-	return (set[pos / 8] & (1 << pos % 8)) >> (pos % 8);
+	set[pos >> 3] ^= 1 << pos % 8;
+	return (set[pos >> 3] >> (pos % 8)) & 1;
 }
 #endif /* #ifdef ENABLE_BITSET */
 
@@ -1400,9 +1409,10 @@ Config_File create_config_file(const char *path)
 /* -------------------- High-level mmap() -------------------- */
 #if defined(ENABLE_MMAP) && defined(__unix)
 
-Mmap *fmap(const char *path, const char *mode)
+Mmap *mopen(const char *path, const char *mode)
 {
-	int prot = PROT_NONE, i, flags = 0;
+	int prot = PROT_NONE, i, o_flags = 0;
+	int exec_flag = 0, flags = MAP_PRIVATE;
 	off_t offset;
 #ifdef INTERNAL_ERROR_HANDLING
 	Mmap *f = (Mmap*) xmalloc(sizeof(Mmap));
@@ -1417,26 +1427,38 @@ Mmap *fmap(const char *path, const char *mode)
 			case 'r':
 				prot |= PROT_READ;
 				if(prot & PROT_WRITE)
-					flags = O_RDWR | O_CREAT | O_CLOEXEC;
+					o_flags = O_RDWR | O_CREAT | O_CLOEXEC;
 				else
-					flags = O_RDONLY | O_CLOEXEC;
+					o_flags = O_RDONLY | O_CLOEXEC;
 				break;
 			case 'w':
 				prot |= PROT_WRITE;
 				if(prot & PROT_READ)
-					flags = O_RDWR | O_CREAT | O_CLOEXEC;
+					o_flags = O_RDWR | O_CREAT | O_CLOEXEC;
 				else
-					flags = O_WRONLY | O_CREAT | O_CLOEXEC;
+					o_flags = O_WRONLY | O_CREAT | O_CLOEXEC;
 				break;
 			case 'x':
-				prot |= PROT_EXEC;
+				exec_flag |= PROT_EXEC;
+				break;
+			case 'p':
+				flags = MAP_PRIVATE;
+				break;
+			case 's':
+				flags = MAP_SHARED;
 				break;
 			default:
+#ifdef INTERNAL_ERROR_HANDLING
+				log_message(LOG_FATAL, "Error: invalid mode");
+				exit(EXIT_FAILURE);
+#else
+				log_message(LOG_ERROR, "Error: invalid mode");
 				free(f);
 				return NULL;
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
 		}
 #ifdef INTERNAL_ERROR_HANDLING
-	i = xopen(path, flags);
+	i = xopen(path, o_flags);
 	if(unlikely((offset = lseek(i, 0, SEEK_END)) == -1)) {
 		perror("Error obtaining file size");
 		exit(EXIT_FAILURE);
@@ -1446,12 +1468,12 @@ Mmap *fmap(const char *path, const char *mode)
 		exit(EXIT_FAILURE);
 	}
 	if(unlikely((f->ptr = (char*) mmap(NULL, offset,
-		prot, MAP_PRIVATE, i, (off_t) 0)) == MAP_FAILED)) {
+		prot, flags, i, (off_t) 0)) == MAP_FAILED)) {
 		perror("Error loading file into memory");
 		exit(EXIT_FAILURE);
 	}
 #else
-	i = open(path, flags);
+	i = open(path, o_flags);
 	if(unlikely(i == -1)) {
 		free(f);
 		return NULL;
@@ -1467,7 +1489,7 @@ Mmap *fmap(const char *path, const char *mode)
 		return NULL;
 	}
 	if(unlikely((f->ptr = (char*) mmap(NULL, offset,
-		prot, MAP_PRIVATE, i, (off_t) 0)) == MAP_FAILED)) {
+		prot | exec_flag, flags, i, (off_t) 0)) == MAP_FAILED)) {
 		close(i);
 		free(f);
 		return NULL;
