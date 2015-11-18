@@ -681,9 +681,9 @@ char *neg_strchr(const char *s, int c)
 	return (char*) (*s == '\0' ? NULL : s);
 }
 
-/* returnArray is set to NULL if all chars in str are separator
- * returnArray and all elements in returnArray are dynamically allocated -> free them all when done */
-size_t split_str(const char *str, const char separator, char ***returnArray)
+/* return_array is set to NULL if all chars in str are separator
+ * return_array and all elements in return_array are dynamically allocated -> free them all when done */
+size_t split_str(const char *str, const char separator, char ***return_array)
 {
 	int i;
 	size_t count = 1;
@@ -693,7 +693,7 @@ size_t split_str(const char *str, const char separator, char ***returnArray)
 	while(*str == separator)
 		str++;
 	if(*str == '\0') {
-		*returnArray = (char**) NULL;
+		*return_array = (char**) NULL;
 		return 0;
 	}
 
@@ -704,10 +704,10 @@ size_t split_str(const char *str, const char separator, char ***returnArray)
 	 * TO NOT SKIP OVER CONSECUTIVE SEPARATORS */
 
 #ifdef INTERNAL_ERROR_HANDLING
-	*returnArray = (char**) xmalloc(count * sizeof(char*));
+	*return_array = (char**) xmalloc(count * sizeof(char*));
 #else
-	*returnArray = (char**) malloc(count * sizeof(char*));
-	if(*returnArray == (char**) NULL)
+	*return_array = (char**) malloc(count * sizeof(char*));
+	if(*return_array == (char**) NULL)
 		return 0;
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
 
@@ -718,19 +718,19 @@ size_t split_str(const char *str, const char separator, char ***returnArray)
 				str++;
 			else {
 #ifdef INTERNAL_ERROR_HANDLING
-				(*returnArray)[count] = (char*) xmalloc(i + 1);
+				(*return_array)[count] = (char*) xmalloc(i + 1);
 #else
-				(*returnArray)[count] = (char*) malloc(i + 1);
-				if((*returnArray)[count] == (char*) NULL) {
+				(*return_array)[count] = (char*) malloc(i + 1);
+				if((*return_array)[count] == (char*) NULL) {
 					for(; count > 0; count--)
-						free((*returnArray)[count - 1]);
-					free(*returnArray);
-					*returnArray = (char**) NULL;
+						free((*return_array)[count - 1]);
+					free(*return_array);
+					*return_array = (char**) NULL;
 					return 0;
 				}
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
-				memcpy((*returnArray)[count], str, i);
-				(*returnArray)[count++][i] = '\0';
+				memcpy((*return_array)[count], str, i);
+				(*return_array)[count++][i] = '\0';
 				str += i+1;
 			}	/* COMMENT THIS LINE TO NOT SKIP OVER CONSECUTIVE SEPARATORS */
 			i = -1;
@@ -738,25 +738,25 @@ size_t split_str(const char *str, const char separator, char ***returnArray)
 	}
 	if(i != 0) {
 #ifdef INTERNAL_ERROR_HANDLING
-		(*returnArray)[count] = (char*) xmalloc(i + 1);
+		(*return_array)[count] = (char*) xmalloc(i + 1);
 #else
-		(*returnArray)[count] = (char*) malloc(i + 1);
-		if((*returnArray)[count] == (char*) NULL) {
+		(*return_array)[count] = (char*) malloc(i + 1);
+		if((*return_array)[count] == (char*) NULL) {
 			for(; count > 0; count--)
-				free((*returnArray)[count - 1]);
-			free(*returnArray);
-			*returnArray = (char**) NULL;
+				free((*return_array)[count - 1]);
+			free(*return_array);
+			*return_array = (char**) NULL;
 			return 0;
 		}
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
-		strcpy((*returnArray)[count++], str);
+		strcpy((*return_array)[count++], str);
 	}
 	return count;
 }
 
-/* returnArray is set to NULL if all chars in str are separator
- * returnArray is dynamically allocated -> free when done */
-size_t split_str_lite(char *str, const char separator, char ***returnArray)
+/* return_array is set to NULL if all chars in str are separator
+ * return_array is dynamically allocated -> free when done */
+size_t split_str_lite(char *str, const char separator, char ***return_array)
 {
 	int i;
 	size_t count = 1;
@@ -766,7 +766,7 @@ size_t split_str_lite(char *str, const char separator, char ***returnArray)
 	while(*str == separator)
 		str++;
 	if(*str == '\0') {
-		*returnArray = (char**) NULL;
+		*return_array = (char**) NULL;
 		return 0;
 	}
 
@@ -777,10 +777,10 @@ size_t split_str_lite(char *str, const char separator, char ***returnArray)
 	 * TO NOT SKIP OVER CONSECUTIVE SEPARATORS */
 
 #ifdef INTERNAL_ERROR_HANDLING
-	*returnArray = (char**) xmalloc(count * sizeof(char*));
+	*return_array = (char**) xmalloc(count * sizeof(char*));
 #else
-	*returnArray = (char**) malloc(count * sizeof(char*));
-	if(*returnArray == (char**) NULL)
+	*return_array = (char**) malloc(count * sizeof(char*));
+	if(*return_array == (char**) NULL)
 		return 0;
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
 
@@ -790,18 +790,48 @@ size_t split_str_lite(char *str, const char separator, char ***returnArray)
 			if(i == 0)
 				str++;
 			else {
-				(*returnArray)[count] = str;
-				(*returnArray)[count++][i] = '\0';
+				(*return_array)[count] = str;
+				(*return_array)[count++][i] = '\0';
 				str += i+1;
 			}	/* COMMENT THIS LINE TO NOT SKIP OVER CONSECUTIVE SEPARATORS */
 			i = -1;
 		}
 	}
 	if(i != 0)
-		(*returnArray)[count++] = str;
+		(*return_array)[count++] = str;
 	return count;
 }
 
+char* str_join(int str_array_size, char* *str_array, char *separator)
+{
+	int total_len = 0, i;
+	size_t separator_len;
+	char *str = (char *) NULL, *start;
+
+	separator_len = strlen(separator);
+	for(i = 0; i < str_array_size; i++)
+		total_len += strlen(str_array[i]);
+
+#ifdef INTERNAL_ERROR_HANDLING
+	str = (char *) xmalloc((total_len + separator_len *
+				(str_array_size - 1) + 1) * sizeof(char));
+#else
+	str = (char *) malloc((total_len + separator_len *
+				(str_array_size - 1) + 1) * sizeof(char));
+	if(str == (char *) NULL)
+		return (char *) NULL;
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
+
+	start = str;
+	for(i = 0; i < str_array_size - 1; i++) {
+		strcpy(start, str_array[i]);
+		start += strlen(str_array[i]);
+		strcpy(start, separator);
+		start += separator_len;
+	}
+	strcpy(start, str_array[i]);
+	return str;
+}
 #endif /* ifdef ENABLE_STRING_MANIPULATION */
 
 
@@ -1000,7 +1030,7 @@ char *make_path(const char *old_path, const char *dir_name)
 }
 #undef FILE_SEPARATOR
 
-void *dirwalk(const char *path, void* (*func)(void*, char*), void *arg)
+void *dirwalk(const char *path, void *(*func)(void*, char*), void *arg)
 {
 	DIR *dir;
 	struct dirent *entry;
@@ -1265,7 +1295,7 @@ int normal_getchar(void)
 /* -------------------- Threading -------------------- */
 #ifdef ENABLE_THREADING
 
-pthread_t launch_thread(void* (*start_routine)(void*), void *arg, int detach)
+pthread_t launch_thread(void *(*start_routine)(void*), void *arg, int detach)
 {
 	pthread_t th;
 	if(pthread_create(&th, NULL, start_routine, arg) != 0) {
