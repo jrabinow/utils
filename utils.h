@@ -288,7 +288,12 @@ size_t split_str(const char *str, const char separator, char ***returnArray);
  * In case of error, *returnArray is NULL and errno is set appropriately */
 size_t split_str_lite(char *str, const char separator, char ***returnArray);
 
-/* returns true if str1 and str2 are 2 the same strings. Helps make code more readable*/
+/* joins all strings in str_array. All strings are joined end to end with a separator
+ * in between each string
+ * returns the resulting dynamically allocated string. free() when done */
+char *str_join(int str_array_size, char **str_array, char *separator);
+
+/* returns true if str1 and str2 are 2 the same strings. Helps make code more readable */
 #define str_equals(str1, str2)	(strcmp(str1, str2) == 0)
 
 #endif /* #ifdef ENABLE_STRING_MANIPULATION */
@@ -370,7 +375,7 @@ char *make_path(const char *path, const char *filename);
  * In case of an error, dirwalk will return NULL and errno will be set appropriately.
  * Please note that if func() returns NULL at every call, you will have to check
  * errno to determine if an error occured */
-void *dirwalk(const char *path, void* (*func)(void* arg, char* path), void *arg);
+void *dirwalk(const char *path, void *(*func)(void *arg, char *path), void *arg);
 
 #endif /* #ifdef ENABLE_FILESYSTEM */
 
