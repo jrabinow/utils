@@ -60,12 +60,7 @@ void init_alloc(void)
 #endif /* #ifdef USING_VALGRIND */
 }
 
-#ifdef ENABLE_BOOL_TYPE
-bool
-#else
-int
-#endif /* #ifdef ENABLE_BOOL_TYPE */
-is_allocated(void *ptr)
+BOOL_TYPE is_allocated(const void *ptr)
 {
 	return heap_bottom <= ptr && ptr <= heap_top;
 }
@@ -309,12 +304,18 @@ FILE *xfdopen(int fd, const char *mode)
 }
 
 #ifdef __unix
-int xopen(const char *path, int flags)
+int xopen(const char *path, int flags, ...)
 {
-	int fd, count = 0;
+	int fd, count = 0, mode = 0;
+	va_list ap;
 
+	if(flags & O_CREAT || flags & O_TMPFILE) {
+		va_start(ap, flags);
+		mode = va_arg(ap, mode_t);
+		va_end(ap);
+	}
 	do {
-		fd = open(path, flags);
+		fd = open(path, flags, mode);
 		if(fd != -1)
 			break;
 		switch(errno) {
@@ -337,7 +338,7 @@ int xopen(const char *path, int flags)
 				count++;
 				break;
 			default:
-				log_message(LOG_FATAL, "Error allocating memory: %s", strerror(errno));
+				log_message(LOG_FATAL, "Error opening file: %s", strerror(errno));
 				exit(EXIT_FAILURE);
 		}
 	} while(1);
@@ -351,12 +352,7 @@ int xopen(const char *path, int flags)
 /* -------------------- STRING MANIPULATION -------------------- */
 #ifdef ENABLE_STRING_MANIPULATION
 
-#ifdef ENABLE_BOOL_TYPE
-bool
-#else
-int
-#endif
-is_valid_int(const char *str)
+BOOL_TYPE is_valid_int(const char *str)
 {
 	if( ! isdigit(*str) && *str != '-')
 		return BOOL_FALSE;
@@ -367,12 +363,7 @@ is_valid_int(const char *str)
 	return BOOL_TRUE;
 }
 
-#ifdef ENABLE_BOOL_TYPE
-bool
-#else
-int
-#endif /* #ifdef ENABLE_BOOL_TYPE */
-is_valid_float(const char *str)
+BOOL_TYPE is_valid_float(const char *str)
 {
 	int period = BOOL_FALSE;
 
@@ -389,12 +380,7 @@ is_valid_float(const char *str)
 	return BOOL_TRUE;
 }
 
-#ifdef ENABLE_BOOL_TYPE
-bool
-#else
-int
-#endif /* #ifdef ENABLE_BOOL_TYPE */
-is_valid_hex(const char *str)
+BOOL_TYPE is_valid_hex(const char *str)
 {
 	size_t i;
 
@@ -404,12 +390,7 @@ is_valid_hex(const char *str)
 	return BOOL_TRUE;
 }
 
-#ifdef ENABLE_BOOL_TYPE
-bool
-#else
-int
-#endif /* #ifdef ENABLE_BOOL_TYPE */
-startswith(const char *str, const char *prefix)
+BOOL_TYPE startswith(const char *str, const char *prefix)
 {
 	while(*str == *prefix) {
 		str++, prefix++;
@@ -419,12 +400,7 @@ startswith(const char *str, const char *prefix)
 	return *prefix == '\0';
 }
 
-#ifdef ENABLE_BOOL_TYPE
-bool
-#else
-int
-#endif /* #ifdef ENABLE_BOOL_TYPE */
-endswith(const char *str, const char *suffix)
+BOOL_TYPE endswith(const char *str, const char *suffix)
 {
 	int i, j;
 	for(i = 0; str[i] != '\0'; i++);
@@ -453,21 +429,24 @@ void str_toupper(char *str)
 			*str = *str - 32;	/* + 'A' - 'a' */
 }
 
-char *const_append(const char *str1, const char *str2)
+char *va_const_append(const char *str, va_list ap)
 {
-	char *new_str = (char*) NULL;
-	size_t len1, len2;
+	char *new_str = (char*) NULL, *ptr = (char*) NULL;
+	va_list aq;
+	size_t len = strlen(str) + 1;
 
-	len1 = strlen(str1);
-	len2 = strlen(str2);
+	va_copy(aq, ap);
+	while((ptr = va_arg(ap, char*)) != NULL)
+		len += strlen(ptr);
 #ifdef INTERNAL_ERROR_HANDLING
-	new_str = (char*) xmalloc(len1 + len2 + 1);
+	ptr = new_str = (char*) xmalloc(len * sizeof(char));
 #else
-	new_str = (char*) malloc(len1 + len2 + 1);
+	ptr = new_str = (char*) malloc(len * sizeof(char));
 	if(new_str != (char*) NULL) {
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
-		memcpy(new_str, str1, len1);
-		memcpy(new_str + len1, str2, len2 + 1);
+		ptr = stpcpy(new_str, str);
+		while((str = va_arg(aq, char*)) != NULL)
+			ptr = stpcpy(ptr, str);
 #ifndef INTERNAL_ERROR_HANDLING
 	}
 #endif /* #ifndef INTERNAL_ERROR_HANDLING */
@@ -475,24 +454,53 @@ char *const_append(const char *str1, const char *str2)
 	return new_str;
 }
 
-char *append(char *str1, const char *str2)
+#undef const_append
+char *const_append(const char *str, ...)
 {
-	size_t len1, len2;
+	va_list ap;
+	char *new_str = (char*) NULL;
+
+	va_start(ap, str);
+	new_str = va_const_append(str, ap);
+	va_end(ap);
+
+	return new_str;
+}
+
+#undef append
+char *append(char *str, ...)
+{
+	char *ptr = (char*) NULL, *new_str = str;
+	va_list ap;
+	size_t orig_len, len = strlen(new_str);
+
+	orig_len = len;
+	va_start(ap, str);
 #ifdef MANAGE_MEM
 	if( ! is_allocated(str1))
-		return const_append(str1, str2);
+		return va_const_append(str, ap);
 #endif /* #ifdef MANAGE_MEM */
-	len1 = strlen(str1);
-	len2 = strlen(str2);
+	while((ptr = va_arg(ap, char*)) != NULL)
+		len += strlen(ptr);
+	len++;
+	va_end(ap);
 #ifdef INTERNAL_ERROR_HANDLING
-	str1 = (char*) xrealloc(str1, len1 + len2 + 1);
+	new_str = (char*) xrealloc(new_str, len * sizeof(char));
 #else
-	str1 = (char*) realloc(str1, len1 + len2 + 1);
-	if(str1 != (char*) NULL)
+	new_str = (char*) realloc(new_str, len * sizeof(char));
+	if(new_str != (char*) NULL) {
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
-		memcpy(str1 + len1, str2, len2 + 1);
+		va_start(ap, str);
+		ptr = new_str + orig_len;
+		/* avoid overflow by doing the calculation in 2 steps */
+		while((str = va_arg(ap, char*)) != NULL)
+			ptr = stpcpy(ptr, str);
+		va_end(ap);
+#ifndef INTERNAL_ERROR_HANDLING
+	}
+#endif /* #ifndef INTERNAL_ERROR_HANDLING */
 
-	return str1;
+	return new_str;
 }
 
 char *extract(const char *str, char start, char end)
@@ -683,7 +691,7 @@ char *neg_strchr(const char *s, int c)
 
 /* return_array is set to NULL if all chars in str are separator
  * return_array and all elements in return_array are dynamically allocated -> free them all when done */
-size_t split_str(const char *str, const char separator, char ***return_array)
+size_t split_str(const char *str, char separator, char ***return_array)
 {
 	int i;
 	size_t count = 1;
@@ -756,7 +764,7 @@ size_t split_str(const char *str, const char separator, char ***return_array)
 
 /* return_array is set to NULL if all chars in str are separator
  * return_array is dynamically allocated -> free when done */
-size_t split_str_lite(char *str, const char separator, char ***return_array)
+size_t split_str_lite(char *str, char separator, char ***return_array)
 {
 	int i;
 	size_t count = 1;
@@ -802,7 +810,7 @@ size_t split_str_lite(char *str, const char separator, char ***return_array)
 	return count;
 }
 
-char* str_join(int str_array_size, char* *str_array, char *separator)
+char* str_join(int str_array_size, char **str_array, char *separator)
 {
 	int total_len = 0, i;
 	size_t separator_len;
@@ -824,9 +832,8 @@ char* str_join(int str_array_size, char* *str_array, char *separator)
 
 	start = str;
 	for(i = 0; i < str_array_size - 1; i++) {
-		strcpy(start, str_array[i]);
-		start += strlen(str_array[i]);
-		strcpy(start, separator);
+		start = stpcpy(start, str_array[i]);
+		memcpy(start, separator, separator_len);
 		start += separator_len;
 	}
 	strcpy(start, str_array[i]);
@@ -844,10 +851,10 @@ char *read_line(FILE *stream)
 	unsigned current_size = 32;
 	char c;
 #ifdef INTERNAL_ERROR_HANDLING
-	char *str = (char*) xmalloc(32);
+	char *str = (char*) xmalloc(current_size);
 #else
-	char *str = (char*) malloc(32);
-	if(str != (char*) NULL)
+	char *str = (char*) malloc(current_size);
+	if(str == (char*) NULL)
 		return (char*) NULL;
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
 
@@ -899,12 +906,12 @@ char *read_line(FILE *stream)
 char *read_file_descriptor(int fd)
 {
 	unsigned current_size = 32;
-	ssize_t i = 0;
+	ssize_t i = 0, ret = 0;
 #ifdef INTERNAL_ERROR_HANDLING
-	char *str = (char*) xmalloc(32);
+	char *str = (char*) xmalloc(current_size);
 #else
-	char *str = (char*) malloc(32);
-	if(str != (char*) NULL)
+	char *str = (char*) malloc(current_size);
+	if(str == (char*) NULL)
 		return (char*) NULL;
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
 
@@ -912,26 +919,25 @@ char *read_file_descriptor(int fd)
 	 * i by the number of characters read and repeat until no more characters
 	 * are available */
 	do {
-		i += read(fd, str + i, current_size - i);
+		ret = read(fd, str + i, current_size - i);
+		if(ret < 0)
+			break;
+		i += ret;
 		if(i == current_size) {
 #ifdef INTERNAL_ERROR_HANDLING
 			str = xrealloc(str, current_size <<= 1);
 #else
 			str = realloc(str, current_size <<= 1);
-			if(str != (char*) NULL)
+			if(str == (char*) NULL)
 				return (char*) NULL;
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
 		}
 	} while(i << 1 == current_size);
 
-	if(i == -1) {
+	if(ret == -1) {
 		free(str);
 		return (char*) NULL;
 	} else {
-		/* remove all non-printable characters from end of string
-		 * see 'isprint' manpage for more details */
-		while(! isprint(str[i-1]))
-			i--;
 		/* allocate precisely as much memory (not a single byte more)
 		 * as is needed to contain the data */
 #ifdef INTERNAL_ERROR_HANDLING
@@ -947,7 +953,6 @@ char *read_file_descriptor(int fd)
 		if(str == (char*) NULL)
 			return (char*) NULL;
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
-		str[i] = '\0';
 	}
 	return str;
 }
@@ -960,13 +965,17 @@ char *read_file_descriptor(int fd)
 bitset new_bitset(size_t size)
 {
 	size_t mem = (size >> 3) + (size % 8 != 0);
-
+#ifdef INTERNAL_ERROR_HANDLING
+	bitset b = (bitset) xmalloc(mem);
+#else
 	bitset b = (bitset) malloc(mem);
-	memset(b, 0, mem);
+	if(likely(b != NULL))
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
+		memset(b, 0, mem);
 	return b;
 }
 
-int getbit(bitset set, int pos)
+int getbit(const bitset set, int pos)
 {
 	return (set[pos >> 3] >> (pos % 8)) & 1;
 }
@@ -991,7 +1000,7 @@ int togglebit(bitset set, int pos)
 
 /* -------------------- Filesystem functions -------------------- */
 #ifdef ENABLE_FILESYSTEM
-int is_dir(char *path)
+int is_dir(const char *path)
 {
 	struct stat buf;
 
@@ -1007,22 +1016,30 @@ int is_dir(char *path)
 #else
 #define FILE_SEPARATOR	'/'
 #endif /* #ifdef _WIN32 */
-char *make_path(const char *old_path, const char *dir_name)
+#undef make_path
+char *make_path(const char *path, ...)
 {
-	char *new_path = (char*) NULL;
-	int len1, len2;
+	char *new_path = (char*) NULL, *ptr = (char*) NULL;
+	va_list ap;
+	size_t len = strlen(path) + 1;
 
-	len1 = strlen(old_path);
-	len2 = strlen(dir_name);
+	va_start(ap, path);
+	while((ptr = va_arg(ap, char*)) != NULL)
+		len += strlen(ptr) + 1;
+	va_end(ap);
 #ifdef INTERNAL_ERROR_HANDLING
-	new_path = (char*) xmalloc(len1 + len2 + 2);
+	ptr = new_path = (char*) xmalloc(len * sizeof(char));
 #else
-	new_path = (char*) malloc(len1 + len2 + 2);
+	ptr = new_path = (char*) malloc(len * sizeof(char));
 	if(new_path != (char*) NULL) {
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
-	memcpy(new_path, old_path, len1);
-	new_path[len1] = FILE_SEPARATOR;
-	memcpy(new_path + len1 + 1, dir_name, len2 + 1);
+		va_start(ap, path);
+		ptr = stpcpy(new_path, path);
+		while((path = va_arg(ap, char*)) != NULL) {
+			*ptr++ = FILE_SEPARATOR;
+			ptr = stpcpy(ptr, path);
+		}
+		va_end(ap);
 #ifndef INTERNAL_ERROR_HANDLING
 	}
 #endif /* #ifndef INTERNAL_ERROR_HANDLING */
@@ -1070,7 +1087,7 @@ void *dirwalk(const char *path, void *(*func)(void*, char*), void *arg)
 /* -------------------- Networking functions -------------------- */
 #ifdef ENABLE_NETWORKING
 
-int connect_to(char *server_name, unsigned port)
+int connect_to(const char *server_name, unsigned port)
 {
 	struct addrinfo *adresses = NULL, *iterator = NULL;
 	char ip_addr[INET6_ADDRSTRLEN] = { 0 }, port_buff[11] = { 0 };
@@ -1090,8 +1107,7 @@ int connect_to(char *server_name, unsigned port)
 		log_message(LOG_INFO, "DNS lookup succesful");
 		iterator = adresses;
 		/* Iterate over linked list until we connect successfully or we run out of addresses. */
-		while(connect(sockfd, iterator->ai_addr, (socklen_t) sizeof *iterator->ai_addr)
-				== CONNECT_ERROR) {
+		while(connect(sockfd, iterator->ai_addr, (socklen_t) sizeof *iterator->ai_addr) != 0) {
 			iterator = iterator->ai_next;
 			if(unlikely(iterator == NULL)) {
 				sockfd = CONNECT_ERROR;
@@ -1115,7 +1131,7 @@ int create_server(unsigned port)
 	unsigned queue = 1;
 	struct sockaddr_in config;
 
-	bzero(&config, sizeof config);
+	memset(&config, 0, sizeof config);
 	config.sin_family = PF_INET;
 	config.sin_addr.s_addr = htonl(INADDR_ANY);
 	config.sin_port = htons(port);
@@ -1130,8 +1146,7 @@ int create_server(unsigned port)
 		/* print error message but keep on going. Failing here will not prevent program from
 		 * working correctly */
 		queue = SOMAXCONN;
-		if(bind(sockfd, (struct sockaddr*) &config, sizeof config) == CONNECT_ERROR ||
-				listen(sockfd, queue) != 0) {
+		if(bind(sockfd, (struct sockaddr*) &config, sizeof config) != 0 || listen(sockfd, queue) != 0) {
 			shutdown(sockfd, SHUT_RDWR);
 			log_message(LOG_ERROR, "Error binding server %d: %s", port, strerror(errno));
 			sockfd = CONNECT_ERROR;
@@ -1149,12 +1164,14 @@ int get_single_client(int server_socket)
 	socklen_t size = sizeof client_config;
 
 	client_fd = accept(server_socket, (struct sockaddr*) &client_config, &size);
-	if(client_fd != CONNECT_ERROR)
+	if(client_fd != -1)
 		log_message(LOG_INFO, "Connection established to %s:%u",
-			inet_ntop(AF_INET, &client_config.sin_addr, buffer, INET6_ADDRSTRLEN),
-			ntohs(client_config.sin_port));
-	else
+				inet_ntop(AF_INET, &client_config.sin_addr, buffer, INET6_ADDRSTRLEN),
+				ntohs(client_config.sin_port));
+	else {
+		client_fd = CONNECT_ERROR;
 		log_message(LOG_ERROR, "Error establishing connection: %s", strerror(errno));
+	}
 
 	return client_fd;
 }
@@ -1171,22 +1188,28 @@ typedef struct {
 	Style s;
 } ColorEnv;
 
-static ColorEnv __session__;
+static ColorEnv __color_session__;
 
 void set_style(Color c, Color bgc, Style s)
 {
 	printf("\x1B[%d;%dm", c + 30, s);
-	__session__.c = c;
-	__session__.s = s;
+	__color_session__.c = c;
+	__color_session__.s = s;
 	printf("\x1B[%dm", bgc + 40);
-	__session__.bgc = bgc;
+	__color_session__.bgc = bgc;
 }
 
-void stylish_print(char *str, Color c, Color bgc, Style s)
+void stylish_printf(Color c, Color bgc, Style s, const char *fmt, ...)
 {
+	va_list ap;
+
+	va_start(ap, fmt);
 	printf("\x1B[%d;%dm", c + 30, s);
-	printf("\x1B[%dm%s\x1B[%dm", bgc + 40, str, __session__.bgc);
-	printf("\x1B[%d;%dm", __session__.c + 30, __session__.s);
+	printf("\x1B[%dm", bgc + 40);
+	vprintf(fmt, ap);
+	va_end(ap);
+	printf("\x1B[%dm", __color_session__.bgc);
+	printf("\x1B[%d;%dm", __color_session__.c + 30, __color_session__.s);
 	fflush(stdout);
 }
 
@@ -1351,6 +1374,7 @@ void mempool_create(struct mempool *mp, size_t size, size_t nmemb)
 		free(mp->ptrs);
 		mp->mem = NULL;
 		mp->ptrs = NULL;
+		mp->size = 0;
 		return;
 	}
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
@@ -1367,36 +1391,36 @@ void mempool_create(struct mempool *mp, size_t size, size_t nmemb)
 
 void *mempool_alloc(struct mempool *mp)
 {
-/*
- * Problem when enlarging memory pool: mp->mem will point to a different chunk of mem,
- * but the pointers pointing to the memory in the mempool will not be updated. Not much
- * we can do about that as of now => let's  disable pool enlarging
- *
- * WARNING: this means that if you call mempool_alloc more than is reasonable, you WILL
- * have problems
- *
-	unsigned i;
-	void *val;
+	/*
+	 * Problem when enlarging memory pool: mp->mem will point to a different chunk of mem,
+	 * but the pointers pointing to the memory in the mempool will not be updated. Not much
+	 * we can do about that as of now => let's  disable pool enlarging
+	 *
+	 * WARNING: this means that if you call mempool_alloc more than is reasonable, you WILL
+	 * have problems
+	 *
+	 unsigned i;
+	 void *val;
 
-	if(mp->index == mp->nmemb) {
-		mp->mem = xrealloc(mp->mem, (sizeof(unsigned) + mp->size) * (mp->nmemb <<= 1));
-		mp->ptrs = xrealloc(mp->ptrs, sizeof(unsigned*) * mp->nmemb);
+	 if(mp->index == mp->nmemb) {
+	 mp->mem = xrealloc(mp->mem, (sizeof(unsigned) + mp->size) * (mp->nmemb <<= 1));
+	 mp->ptrs = xrealloc(mp->ptrs, sizeof(unsigned*) * mp->nmemb);
 
-		val = mp->mem;
-		for(i = 0; i < mp->nmemb; i++) {
-			mp->ptrs[i] = val;
-			val += sizeof(unsigned) + mp->size;
-		}
-	}
-*/
+	 val = mp->mem;
+	 for(i = 0; i < mp->nmemb; i++) {
+	 mp->ptrs[i] = val;
+	 val += sizeof(unsigned) + mp->size;
+	 }
+	 }
+	 */
 	*(unsigned*) mp->ptrs[mp->index] = mp->index;
-	return (byte*) mp->ptrs[mp->index++] + sizeof(unsigned);
+	return likely(mp->index < mp->nmemb) ? (void*) mp->ptrs[mp->index++] + sizeof(unsigned) : (void*) NULL;
 }
 
 void mempool_free(struct mempool *mp, void *ptr)
 {
 	void *swap;
-	unsigned idx = *(unsigned*) ((byte*) ptr - sizeof(unsigned));
+	unsigned idx = *(unsigned*) ((void*) ptr - sizeof(unsigned));
 
 	swap = mp->ptrs[idx];
 	mp->ptrs[idx] = mp->ptrs[--mp->index];
@@ -1427,7 +1451,7 @@ Config_File create_config_file(const char *path)
 #else
 	cfg_file.file = fopen(path, "w");
 	if(cfg_file.file == NULL)
-	cfg_file. = (Cfg_Var*) malloc(CFG_FILE_START_SIZE * sizeof(Cfg_Var));
+		cfg_file. = (Cfg_Var*) malloc(CFG_FILE_START_SIZE * sizeof(Cfg_Var));
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
 
 	return cfg_file;
@@ -1498,7 +1522,7 @@ Mmap *mopen(const char *path, const char *mode)
 		exit(EXIT_FAILURE);
 	}
 	if(unlikely((f->ptr = (char*) mmap(NULL, offset,
-		prot, flags, i, (off_t) 0)) == MAP_FAILED)) {
+						prot, flags, i, (off_t) 0)) == MAP_FAILED)) {
 		perror("Error loading file into memory");
 		exit(EXIT_FAILURE);
 	}
@@ -1519,7 +1543,7 @@ Mmap *mopen(const char *path, const char *mode)
 		return NULL;
 	}
 	if(unlikely((f->ptr = (char*) mmap(NULL, offset,
-		prot | exec_flag, flags, i, (off_t) 0)) == MAP_FAILED)) {
+						prot | exec_flag, flags, i, (off_t) 0)) == MAP_FAILED)) {
 		close(i);
 		free(f);
 		return NULL;
@@ -1536,26 +1560,90 @@ size_t mread(void *ptr, size_t size, size_t nmemb, Mmap *f)
 {
 	size_t rsize = size * nmemb;
 
-	if(f->offset + size * nmemb > f->endptr)
-		rsize = f->endptr - f->offset;
-	/* use of memmove instead of memcpy is intentional.
-	 * We can now 'shift' data in a file */
-	memmove(ptr, f->offset, rsize);
-	f->offset += rsize;
+	if(unlikely(f == NULL || f->ptr == NULL || f->offset == NULL || f->endptr == NULL))
+		errno = EBADF;
+	else {
+		if(f->offset + size * nmemb >= f->endptr)
+			rsize = f->endptr - f->offset;
+		/* use of memmove instead of memcpy is intentional.
+		 * We can now 'shift' data in a file */
+		memmove(ptr, f->offset, rsize);
+		f->offset += rsize;
+	}
 
 	return rsize;
 }
 
+/* TODO: when insufficient memory is available, allocate more memory */
 size_t mwrite(void *ptr, size_t size, size_t nmemb, Mmap *f)
 {
 	size_t wsize = size * nmemb;
 
-	if(f->offset + size * nmemb > f->endptr)
-		wsize = f->endptr - f->offset;
-	memmove(f->offset, ptr, wsize);
-	f->offset += wsize;
+	if(unlikely(f == NULL || f->ptr == NULL || f->offset == NULL || f->endptr == NULL))
+		errno = EBADF;
+	else {
+		if(f->offset + size * nmemb >= f->endptr)
+			wsize = f->endptr - f->offset;
+		memmove(f->offset, ptr, wsize);
+		f->offset += wsize;
+	}
 
 	return wsize;
+}
+
+int mgetc(Mmap *f)
+{
+	int ret = EOF;
+
+	if(unlikely(f == NULL || f->ptr == NULL || f->offset == NULL || f->endptr == NULL))
+		errno = EBADF;
+	else
+		ret = f->offset < f->endptr ? (int) *f->offset++ :  EOF;
+	return ret;
+}
+
+/* TODO: implement */
+int mputc(int c, Mmap *f)
+{
+	(void) c;
+	(void) f;
+	failwith("function not yet implemented");
+	return EOF;
+}
+
+char *mgets(char *s, int size, Mmap *f)
+{
+	int i = 0;
+	char *ret = (char*) NULL;
+
+	if(unlikely(f == NULL || f->ptr == NULL || f->offset == NULL || f->endptr == NULL))
+		errno = EBADF;
+	else if(f->offset < f->endptr) {
+		while(i < size && f->offset < f->endptr) {
+			s[i++] = *f->offset++;
+			if(s[i-1] == EOF || s[i-1] == '\n')
+				break;
+		}
+		s[i] = '\0';
+		ret = s;
+	}
+	return ret;
+}
+
+int mungetc(int c, Mmap *f)
+{
+	int ret = EOF;
+
+	if(unlikely(f == NULL || f->ptr == NULL || f->offset == NULL || f->endptr == NULL))
+		errno = EBADF;
+	else if(f->offset >= f->ptr) {
+		*f->offset = c;
+		if(likely(f->offset != f->ptr))
+			f->offset--;
+		ret = c;
+	} else
+		errno = 1;
+	return ret;
 }
 
 /* TODO: determine by how much to increment f->offset */
@@ -1573,42 +1661,98 @@ int mscanf(Mmap *f, const char *fmt, ...)
 }
 #endif
 
+/* TODO: prevent buffer overflow in case of insufficient memory */
 int mprintf(Mmap *f, const char *fmt, ...)
 {
 	va_list ap;
-	int ret;
+	int ret = -1;
 
-	va_start(ap, fmt);
-	ret = vsprintf(f->offset, fmt, ap);
-	f->offset += ret;
-	va_end(ap);
+	failwith("this function can cause buffer overflows in its current implementation");
+	if(unlikely(f == NULL || f->ptr == NULL || f->offset == NULL || f->endptr == NULL))
+		errno = EBADF;
+	else {
+		va_start(ap, fmt);
+		ret = vsprintf(f->offset, fmt, ap);
+		f->offset += ret;
+		va_end(ap);
+	}
 
 	return ret;
 }
 
+/* TODO: remove limitation on size */
 int mnprintf(Mmap *f, size_t size, const char *fmt, ...)
 {
 	va_list ap;
-	int ret;
+	int ret = -1;
 
-	va_start(ap, fmt);
-	ret = vsnprintf(f->offset, size, fmt, ap);
-	f->offset += ret;
-	va_end(ap);
+	if(unlikely(f == NULL || f->ptr == NULL || f->offset == NULL || f->endptr == NULL))
+		errno = EBADF;
+	else {
+/*		size = int_max(size, f->ptr - f->offset); */
+		va_start(ap, fmt);
+		ret = vsnprintf(f->offset, size, fmt, ap);
+		f->offset += ret;
+		va_end(ap);
+	}
 
 	return ret;
 }
 
-void unmap_file(Mmap *f)
+off_t mseek(Mmap *f, off_t offset, int whence)
 {
+	off_t ret = (off_t) -1;
+
+	if(unlikely(f == NULL || f->ptr == NULL || f->offset == NULL || f->endptr == NULL))
+		errno = EBADF;
+	else
+		switch(whence) {
+			case SEEK_SET:
+				ret = (off_t) (f->offset = f->ptr + offset);
+				break;
+			case SEEK_CUR:
+				ret = (off_t) (f->offset += offset);
+				break;
+			case SEEK_END:
+				ret = (off_t) (f->offset = f->endptr + offset);
+				break;
+#ifdef __unix
+			case SEEK_DATA:
+				if(f->offset > f->endptr)
+					errno = ENXIO;
+				ret = (off_t) (f->offset += offset);
+				break;
+			case SEEK_HOLE:
+				if(f->offset > f->endptr)
+					errno = ENXIO;
+				ret = (off_t) (f->offset = f->endptr + offset);
+				break;
+#endif /* #ifdef __unix */
+			default:
+				errno = EINVAL;
+		}
+	return ret;
+}
+
+int mclose(Mmap *f)
+{
+	int ret = 0;
+
+	if(unlikely(f == NULL || f->ptr == NULL || f->offset == NULL || f->endptr == NULL)) {
+		errno = EBADF;
+		ret = EOF;
+	}
 	munmap(f->ptr, (size_t) (f->endptr - f->ptr));
 	free(f);
+
+	return ret;
 }
 
 #endif /* #if defined(ENABLE_MMAP) && defined(__unix) */
 
 /* -------------------- Misc functions -------------------- */
 #ifdef ENABLE_MISC
+
 Weekday get_day_of_week(int day, int month, int year)
 {
 	int k, j;
@@ -1696,6 +1840,20 @@ unsigned int gcd(unsigned int u, unsigned int v)
 	return u << shift;
 }
 
+int32_t int_max(int32_t a, int32_t b)
+{
+	register int32_t c = a - b;
+	register int32_t k = (c >> 31) & 0x1;
+	return a - k * c;
+}
+
+int32_t int_min(int32_t a, int32_t b)
+{
+	register int32_t c = b - a;
+	register int32_t k = (c >> 31) & 0x1;
+	return a + k * c;
+}
+
 void *initialize_vector(void *dest, const void *src, size_t size, size_t nmemb)
 {
 	size_t i;
@@ -1723,7 +1881,7 @@ void register_signal_handler(int signum, void (*sighandler)(int))
 
 /* From
 http://www.emoticode.net/c/an-example-log-function-using-different-log-levels-and-variadic-macros.html
- */
+*/
 static log_level_t __g_loglevel = LOG_DEBUG;
 static FILE *__g_loghandle = NULL;
 
@@ -1733,22 +1891,22 @@ void init_log(FILE *stream, log_level_t loglevel)
 	__g_loghandle = stream;
 }
 
-void log_message(log_level_t level, const char *format, ...)
+void va_log_message(log_level_t level, const char *fmt, va_list ap)
 {
 	char buffer[255] = { 0 }, timestamp[255] = { 0 }, *slevel;
-	va_list ap;
 	time_t rawtime;
 	struct tm *timeinfo;
 #if defined(ENABLE_TERMIOS_MANIPULATION) && defined(__unix)
 	Color color = WHITE, bgcolor = BLACK;
 #endif	/* #if defined(ENABLE_TERMIOS_MANIPULATION) && defined(__unix) */
-	if(unlikely(__g_loghandle == NULL))
+	if(unlikely(__g_loghandle == NULL)) {
 		__g_loghandle = stderr;
+		fprintf(stderr, "\x1B[%d;0mWARNING: init_log() was not called\n", YELLOW + 30);
+		reset_style(stderr);
+	}
 
 	if(level >= __g_loglevel) {
-		va_start(ap, format);
-		vsnprintf(buffer, 255, format, ap);
-		va_end(ap);
+		vsnprintf(buffer, 255, fmt, ap);
 		time(&rawtime);
 		timeinfo = localtime(&rawtime);
 		strftime(timestamp, 255, "%d/%m/%Y %X", timeinfo);
@@ -1759,15 +1917,15 @@ void log_message(log_level_t level, const char *format, ...)
 				break;
 			case LOG_INFO:
 				slevel = "INFO";
-				color = GREEN;
+				bgcolor = GREEN;
 				break;
 			case LOG_WARNING:
 				slevel = "WARNING";
-				color = YELLOW;
+				bgcolor = BLUE;
 				break;
 			case LOG_ERROR:
 				slevel = "ERROR";
-				color = RED;
+				bgcolor = YELLOW;
 				break;
 			case LOG_FATAL:
 			default:
@@ -1781,17 +1939,29 @@ void log_message(log_level_t level, const char *format, ...)
 			fprintf(__g_loghandle, "\x1B[%dm[%s] [%s] %s", bgcolor + 40, timestamp, slevel, buffer);
 			reset_style(__g_loghandle);
 			putc('\n', __g_loghandle);
-			fflush(__g_loghandle);
 		} else
 #endif	/* #if defined(ENABLE_TERMIOS_MANIPULATION) && defined(__unix) */
 			fprintf(__g_loghandle, "[%s] [%s] %s\n", timestamp, slevel, buffer);
 	}
 }
 
-void failwith(const char *errmsg)
+void log_message(log_level_t level, const char *fmt, ...)
 {
-	fputs(errmsg, stderr);
-	fputc('\n', stderr);
+	va_list ap;
+
+	va_start(ap, fmt);
+	va_log_message(level, fmt, ap);
+	va_end(ap);
+}
+
+void failwith(const char *errmsg, ...)
+{
+	va_list ap;
+
+	va_start(ap, errmsg);
+	log_message(LOG_FATAL, errmsg);
+	va_end(ap);
+
 	exit(EXIT_FAILURE);
 }
 

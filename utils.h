@@ -18,11 +18,6 @@
 #ifndef UTILS_H
 #define UTILS_H
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <errno.h>
-
 /* Read through this file to find out precisely what is enabled by the
  * following #defines */
 
@@ -33,7 +28,7 @@
 /* Enables memory management such as heap memory identification. Planned: leak
  * detection and related */
 /* #define MANAGE_MEM */
-/* define error "squashing" functions. Program exits if error happens. Disable
+/* define error "squashing" functions. Program exits if error happens. Use sparingly
  * if your application must meet certain robustness requirements */
 #define ENABLE_ERROR_HANDLING
 /* Various string manipulation functions */
@@ -99,6 +94,15 @@
 # define unlikely(x)	(x)
 #endif
 
+#ifdef __unix
+# define _GNU_SOURCE
+#endif
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
+
 extern int errno;
 
 #include <stdint.h>
@@ -127,8 +131,6 @@ extern int errno;
 # define MAX_RETRIES_ALLOC	3
 #endif /* #if defined(MANAGE_MEM) || defined(ENABLE_ERROR_HANDLING) */
 
-
-
 /* -------------------- MEMORY MANAGEMENT -------------------- */
 #ifdef MANAGE_MEM
 
@@ -146,7 +148,7 @@ void init_alloc(void);
  * if(is_allocated(myptr))
  *	free(myptr);
  */
-BOOL_TYPE is_allocated(void *ptr);
+BOOL_TYPE is_allocated(const void *ptr);
 
 /* if you're too lazy to do like in the previous example, this function does it for you */
 void xfree(void *ptr);
@@ -159,8 +161,8 @@ void xfree(void *ptr);
 
 #ifdef __unix
 # include <unistd.h>
-# include <fcntl.h>
 # include <signal.h>
+# include <fcntl.h>
 #endif /* #ifdef __unix */
 
 /* exit program with failed status if malloc and consorts fail
@@ -179,7 +181,7 @@ FILE *xfopen(const char *file, const char *mode);
 FILE *xfdopen(int fd, const char *mode);
 
 #ifdef __unix
-int xopen(const char *path, int flags);
+int xopen(const char *path, int flags, ...);
 /* attempts to create a pipe. Calls exit() at failure */
 #define xpipe(pipefd)\
 	if(pipe(pipefd) != 0) {\
@@ -223,14 +225,38 @@ void str_tolower(char *str);
 /* sets str to upper case */
 void str_toupper(char *str);
 
-/* Creates a new string composed of str2 appended to str1
- * free() when done */
-char *const_append(const char *str1, const char *str2);
+#ifdef C99
+#include <stdarg.h>
+/* __VA_ARGS__ is not available for macros before the C99 standard
+ * TODO: figure out a way to port these functions to C89
+ * http://stackoverflow.com/questions/5588855/standard-alternative-to-gccs-va-args-trick
+ */
 
-/* Appends str2 to str1. str1 MUST be dynamically allocated and will be modified by calling
- * this function. It might also be moved to another memory location.
+/* Appends together all string args passed as parameters.
  * free() when done */
-char *append(char *str1, const char *str2);
+char *const_append(const char *str, ...);
+
+#define const_append(...)		const_append(__VA_ARGS__, (char*) NULL)
+
+/* Following workaround for C89 won't work:
+ * foo = const_append("bar", "baz");
+ * expands to
+ * foo = #pragma("WARNING ...) const_append
+ */
+/* #define const_append			#pragma("WARNING: make sure const_append's last argument is (char*) NULL")\
+					const_append*/
+
+/* Appends together all strings passed as parameters. str (first arg) MUST be dynamically
+ * allocated and will be modified by calling this function. It might also be moved to
+ * a different memory location.
+ * free() when done */
+char *append(char *str, ...);
+
+#define append(...)	append(__VA_ARGS__, (char*) NULL)
+/* See const_append for why the following won't work */
+/* #define append			#pragma("WARNING: make sure append's last argument is (char*) NULL")\
+				append*/
+#endif /* ifdef C99 */
 
 /* extracts portion of str contained between 1st occurence of start and first occurence (following start) of end.
  * If str does not contain start or end char, or there is no end character after start,
@@ -272,21 +298,21 @@ const char *rev_strcspn(const char *str, const char *accept);
 char *neg_strchr(const char *s, int c);
 
 /* separates str along separator chars into non-empty tokens. If str is composed only
- * of separator chars, returnArray will point to NULL.
- * Otherwise, returnArray will point to dynamically allocated array with one string token
+ * of separator chars, return_array will point to NULL.
+ * Otherwise, return_array will point to dynamically allocated array with one string token
  * per array element.
  * return value is size of array.
- * free() *returnArray, (*returnArray)[0], (*returnArray)[1] ... when done.
- * In case of error, *returnArray is NULL and errno is set appropriately */
-size_t split_str(const char *str, const char separator, char ***returnArray);
+ * free() *return_array, (*return_array)[0], (*return_array)[1] ... when done.
+ * In case of error, *return_array is NULL and errno is set appropriately */
+size_t split_str(const char *str, char separator, char ***return_array);
 
-/* Same thing as split_str, except that elements in returnArray are pointers to locations
+/* Same thing as split_str, except that elements in return_array are pointers to locations
  * in the original string. Use only if you have no more use for original data as it is
  * modified (each separator char is replaced by a '\0')
  * This function is more efficient as there is no data copying involved, and the only
- * allocated memory is *returnArray
- * In case of error, *returnArray is NULL and errno is set appropriately */
-size_t split_str_lite(char *str, const char separator, char ***returnArray);
+ * allocated memory is *return_array
+ * In case of error, *return_array is NULL and errno is set appropriately */
+size_t split_str_lite(char *str, char separator, char ***return_array);
 
 /* joins all strings in str_array. All strings are joined end to end with a separator
  * in between each string
@@ -306,8 +332,11 @@ char *str_join(int str_array_size, char **str_array, char *separator);
 /* reads a complete line (no length limit) from file.
  * free() buffer when done. As an alternative, look up getline(3) */
 char *read_line(FILE *stream);
-/* for portability with old code */
+/* for compatibility with old code. Deprecated */
 #define readLine	read_line
+
+/* Use fgets without a preallocated buffer. free() when done */
+#define afgets(stream) getline(NULL, 0, (stream))
 
 #ifdef __unix
 /* read as much as possible from file descriptor.
@@ -338,7 +367,7 @@ bitset new_bitset(size_t size);
 #define free_bitset	free
 
 /* obtain bit at position pos from set array */
-int getbit(bitset set, int pos);
+int getbit(const bitset set, int pos);
 
 /* set bit at position pos to 1 */
 void setbit(bitset set, int pos);
@@ -361,13 +390,24 @@ int togglebit(bitset set, int pos);
 #endif /* #ifdef __unix */
 
 #include <dirent.h>
+#include <stdarg.h>
 
-int is_dir(char *path);
+int is_dir(const char *path);
 
-/* creates a new dynamically allocated string of the form "path/filename"
- * or "path\filename" if on windows
+#ifdef C99
+/* creates a new dynamically allocated string of the form "arg1/arg2/.../argN"
+ * or "arg1\arg2\...\argN" if on windows
  * free() when done */
-char *make_path(const char *path, const char *filename);
+char *make_path(const char *path, ...);
+
+#define make_path(...)	make_path(__VA_ARGS__, (char*) NULL)
+
+/* TODO: figure out a way to port this function to C89
+ * http://stackoverflow.com/questions/5588855/standard-alternative-to-gccs-va-args-trick
+ */
+/*#define make_path		#pragma("WARNING: make sure make_path's last argument is (char*) NULL")\
+				make_path */
+#endif /* ifdef C99 */
 
 /* iterates over and calls func() on every file in filesystem under path. arg is
  * an argument passed as 1st argument to func.
@@ -392,10 +432,10 @@ void *dirwalk(const char *path, void *(*func)(void *arg, char *path), void *arg)
 #define CONNECT_ERROR		-1
 
 /* connect to server server_name running on port port. server_name can be a
- * hostname or an IP address. Returns a file descriptor through which 
+ * hostname or an IP address. Returns a file descriptor through which
  * communication with the server is possible, or CONNECT_ERROR in case
  * of error */
-int connect_to(char *server_name, unsigned port);
+int connect_to(const char *server_name, unsigned port);
 
 /* create a server listening on port port. Returns a file descriptor to a socket
  * ready to accept() clients, or CONNECT_ERROR in case of error */
@@ -422,12 +462,14 @@ typedef enum { BLACK, RED, GREEN, YELLOW, BLUE, PINK, CYAN, WHITE } Color;
 
 typedef enum { NORMAL, BOLD, DARK, ITALIC, UNDERLINED } Style;
 
-/* set font color to c, background color to bgc and font style to s */
+/* set font color to c, background color to bgc and font style to s
+ * WARNING: THIS FUNCTION IS NOT THREAD-SAFE !!! */
 void set_style(Color c, Color bgc, Style s);
 
-/* print a single string str with font color c, background color bgc and style s
- * restores previous state of terminal after printing str */
-void stylish_print(char *str, Color c, Color bgc, Style s);
+/* print a string fmt with font color c, background color bgc and style s
+ * restores previous state of terminal after printing fmt
+ * WARNING: THIS FUNCTION IS NOT THREAD-SAFE !!! */
+void stylish_printf(Color c, Color bgc, Style s, const char *fmt, ...);
 
 /* reset everything to default */
 #define reset_style(stream)		fprintf(stream, "\x1B[0m")
@@ -485,10 +527,13 @@ struct mempool {
 	size_t size, nmemb, index;
 };
 
-/* create memory pool of nmemb elements, each of size size */
+/* create memory pool of nmemb elements, each of size size. If internal error
+ * handling is disabled and this function fails, mp->size = 0 */
 void mempool_create(struct mempool *mp, size_t size, size_t nmemb);
 
-/* obtain one element from the mempool */
+/* obtain one element from the mempool
+ * Returns pointer to valid element space on success and NULL on failure. See
+ * implementation comment for details */
 void *mempool_alloc(struct mempool *mp);
 
 /* free the memory pointed to by ptr back into the memory pool */
@@ -504,23 +549,32 @@ void mempool_delete(struct mempool *mp);
 /* -------------------- High-level mmap() -------------------- */
 #if defined(ENABLE_MMAP) && defined(__unix)
 
+#include <unistd.h>
 #include <sys/mman.h>
 
 typedef struct {
 	  char *ptr, *offset, *endptr;
 } Mmap;
 
-/* Map file to memory space. Mode can be any of the characters 'r', 'w' or 'x'
- * in any order, or empty string for PROT_NONE (see mmap(2) for details) */
+/* Map file to memory space. Mode can contain any of the characters 'r', 'w' or 'x'
+ * in any order, or none of "rwx" for PROT_NONE (see mmap(2) for details)
+ * Mode can also contain 's' or 'p' for shared or private memory mapping. Only
+ * the last 's' or 'p' in the string will take effect. Address space is mapped
+ * private by default */
 Mmap *mopen(const char *path, const char *mode);
 
 size_t mread(void *ptr, size_t size, size_t nmemb, Mmap *f);
 size_t mwrite(void *ptr, size_t size, size_t nmemb, Mmap *f);
-int mprintf(Mmap *f, const char *fmt, ...);
+
+int mgetc(Mmap *f);
+
+char *mgets(char *s, int size, Mmap *f);
+/* In its current implementation, this function can cause buffer overflows. Use mnprintf instead for the time being */
+/*int mprintf(Mmap *f, const char *fmt, ...); */
 int mnprintf(Mmap *f, size_t size, const char *fmt, ...);
 
 /* Unmap and close resources */
-void unmap_file(Mmap *f);
+int mclose(Mmap *f);
 
 #endif /* #if defined(ENABLE_MMAP) && defined(__unix) */
 
@@ -556,25 +610,13 @@ unsigned hexatoi(const char *hex);
 /* return greatest common divisor of u and v */
 unsigned int gcd(unsigned int u, unsigned int v);
 
-#ifdef C99
-inline int_fast32_t int_max(int a, int b)
-{
-	register int_fast32_t c = a - b;
-	register int_fast32_t k = (c >> 31) & 0x1;
-	return a - k * c;
-}
-
-inline int_fast32_t int_min(int a, int b)
-{
-	register int_fast32_t c = b - a;
-	register int_fast32_t k = (c >> 31) & 0x1;
-	return a + k * c;
-}
-
+int32_t int_max(int32_t a, int32_t b);
+int32_t int_min(int32_t a, int32_t b);
+/*#ifdef C99
 #else
-# define int_max(a, b) ((a) - ((((a) - (b)) >> 31) & 0x1) * ((a) - (b)))
-# define int_min(a, b) ((a) + ((((b) - (a)) >> 31) & 0x1) * ((b) - (a)))
-#endif
+# define int_max(a, b)	((a) - ((((a) - (b)) >> 31) & 0x1) * ((a) - (b)))
+# define int_min(a, b)	((a) + ((((b) - (a)) >> 31) & 0x1) * ((b) - (a)))
+#endif *//* #ifdef C99 */
 
 /* Efficiently fill dest with contents of src. src is a single element of size size. dest is a
  * memory buffer of size size * nmemb
@@ -607,7 +649,7 @@ void log_message(log_level_t level, const char *format, ... );
 
 /* prints errmsg to stderr and calls exit(). Functions previously registered with atexit()
  * will be called */
-void failwith(const char *errmsg);
+void failwith(const char *errmsg, ...);
 
 /* swap variables a and b. Both a and b must be of type TYPE */
 #define SWAP(a, b, TYPE) {\
