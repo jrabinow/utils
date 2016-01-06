@@ -1,7 +1,7 @@
 # utils
 Various utility functions for C programming
 
-C is rather low-level, and while this can be seen as one of its strengths, it can also result in lots of time spent on figuring out details rather than concentrating on the task at hand.
+C is rather low-level, and while this can be seen as one of its strengths, it can also result in lots of time spent on reinventing the wheel and figuring out details rather than concentrating on the task at hand.
 The goal of this "library" is to ensure that as little time as possible is spent reinventing the wheel.
 The end goal is to provide functions built-in to other languages such as Java or Python, but which are not part of the GNU libc.
 

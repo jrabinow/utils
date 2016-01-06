@@ -232,11 +232,13 @@ void str_toupper(char *str);
  * http://stackoverflow.com/questions/5588855/standard-alternative-to-gccs-va-args-trick
  */
 
+#ifdef C99
 /* Appends together all string args passed as parameters.
  * free() when done */
 char *const_append(const char *str, ...);
 
 #define const_append(...)		const_append(__VA_ARGS__, (char*) NULL)
+#endif /* #ifdef C99 */
 
 /* Following workaround for C89 won't work:
  * foo = const_append("bar", "baz");
