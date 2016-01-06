@@ -429,6 +429,7 @@ void str_toupper(char *str)
 			*str = *str - 32;	/* + 'A' - 'a' */
 }
 
+#ifdef C99
 char *va_const_append(const char *str, va_list ap)
 {
 	char *new_str = (char*) NULL, *ptr = (char*) NULL;
@@ -466,6 +467,7 @@ char *const_append(const char *str, ...)
 
 	return new_str;
 }
+#endif /* #ifdef C99 */
 
 #undef append
 char *append(char *str, ...)
@@ -476,10 +478,10 @@ char *append(char *str, ...)
 
 	orig_len = len;
 	va_start(ap, str);
-#ifdef MANAGE_MEM
+#if defined(MANAGE_MEM) && defined(C99)
 	if( ! is_allocated(str1))
 		return va_const_append(str, ap);
-#endif /* #ifdef MANAGE_MEM */
+#endif /* #if defined(MANAGE_MEM) && defined(C99) */
 	while((ptr = va_arg(ap, char*)) != NULL)
 		len += strlen(ptr);
 	len++;
@@ -1391,30 +1393,32 @@ void mempool_create(struct mempool *mp, size_t size, size_t nmemb)
 
 void *mempool_alloc(struct mempool *mp)
 {
+	void *ptr = (void*) NULL;
 	/*
 	 * Problem when enlarging memory pool: mp->mem will point to a different chunk of mem,
 	 * but the pointers pointing to the memory in the mempool will not be updated. Not much
-	 * we can do about that as of now => let's  disable pool enlarging
-	 *
-	 * WARNING: this means that if you call mempool_alloc more than is reasonable, you WILL
-	 * have problems
-	 *
-	 unsigned i;
-	 void *val;
-
-	 if(mp->index == mp->nmemb) {
-	 mp->mem = xrealloc(mp->mem, (sizeof(unsigned) + mp->size) * (mp->nmemb <<= 1));
-	 mp->ptrs = xrealloc(mp->ptrs, sizeof(unsigned*) * mp->nmemb);
-
-	 val = mp->mem;
-	 for(i = 0; i < mp->nmemb; i++) {
-	 mp->ptrs[i] = val;
-	 val += sizeof(unsigned) + mp->size;
-	 }
-	 }
+	 * we can do about that => let's  disable pool enlarging
 	 */
-	*(unsigned*) mp->ptrs[mp->index] = mp->index;
-	return likely(mp->index < mp->nmemb) ? (void*) mp->ptrs[mp->index++] + sizeof(unsigned) : (void*) NULL;
+	/*
+	 * unsigned i;
+	 * void *val;
+	 *
+	 * if(mp->index == mp->nmemb) {
+	 *	mp->mem = xrealloc(mp->mem, (sizeof(unsigned) + mp->size) * (mp->nmemb <<= 1));
+	 *	mp->ptrs = xrealloc(mp->ptrs, sizeof(unsigned*) * mp->nmemb);
+	 *
+	 *	val = mp->mem;
+	 *	for(i = 0; i < mp->nmemb; i++) {
+	 *		mp->ptrs[i] = val;
+	 *		val += sizeof(unsigned) + mp->size;
+ *	}
+	 * }
+	 */
+	if(mp->index < mp->nmemb) {
+		*(unsigned*) mp->ptrs[mp->index] = mp->index;
+		ptr = (void*) mp->ptrs[mp->index++] + sizeof(unsigned);
+	}
+	return ptr;
 }
 
 void mempool_free(struct mempool *mp, void *ptr)
@@ -1689,7 +1693,7 @@ int mnprintf(Mmap *f, size_t size, const char *fmt, ...)
 	if(unlikely(f == NULL || f->ptr == NULL || f->offset == NULL || f->endptr == NULL))
 		errno = EBADF;
 	else {
-/*		size = int_max(size, f->ptr - f->offset); */
+		size = int_max(size, f->ptr - f->offset);
 		va_start(ap, fmt);
 		ret = vsnprintf(f->offset, size, fmt, ap);
 		f->offset += ret;
