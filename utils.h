@@ -76,6 +76,9 @@
  * line.
  * -------------------------------------------------------------------------- */
 
+/* Operating system detection macros:
+ * http://nadeausoftware.com/articles/2012/01/c_c_tip_how_use_compiler_predefined_macros_detect_operating_system */
+
 #if defined(__STDC__)
 # define C89
 # if defined(__STDC_VERSION__)
@@ -164,6 +167,10 @@ void xfree(void *ptr);
 # include <signal.h>
 # include <fcntl.h>
 #endif /* #ifdef __unix */
+
+#ifdef __linux__
+# include <linux/version.h>
+#endif /* #ifdef __linux__ */
 
 /* exit program with failed status if malloc and consorts fail
  * -> no more error checking necessary
