@@ -443,6 +443,26 @@ void str_toupper(char *str)
 			*str = *str - 32;	/* + 'A' - 'a' */
 }
 
+#if (! defined(__linux__)) && (! defined(BSD))
+char *stpcpy(char *dest, const char *src)
+{
+	size_t len = strlen(src);
+
+	memcpy(dest, src, len + 1);
+
+	return dest + 1;
+}
+#endif /* #if (! defined(__linux__)) && (! defined(BSD)) */
+
+#ifndef __linux__
+char *strchrnul(const char *s, int c)
+{
+	const char *ptr = strchr(s, c);
+
+	return (char*) (ptr != (char*) NULL ? ptr : ptr + strlen(s));
+}
+#endif /* #ifndef __linux__ */
+
 #ifdef C99
 char *va_const_append(const char *str, va_list ap)
 {
@@ -451,7 +471,7 @@ char *va_const_append(const char *str, va_list ap)
 	size_t len = strlen(str) + 1;
 
 	va_copy(aq, ap);
-	while((ptr = va_arg(ap, char*)) != NULL)
+	while((ptr = va_arg(ap, char*)) != (char*) NULL)
 		len += strlen(ptr);
 #ifdef INTERNAL_ERROR_HANDLING
 	ptr = new_str = (char*) xmalloc(len * sizeof(char));
@@ -460,7 +480,7 @@ char *va_const_append(const char *str, va_list ap)
 	if(new_str != (char*) NULL) {
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
 		ptr = stpcpy(new_str, str);
-		while((str = va_arg(aq, char*)) != NULL)
+		while((str = va_arg(aq, char*)) != (char*) NULL)
 			ptr = stpcpy(ptr, str);
 #ifndef INTERNAL_ERROR_HANDLING
 	}
@@ -1494,7 +1514,7 @@ Config_File create_config_file(const char *path)
 
 
 /* -------------------- High-level mmap() -------------------- */
-#if defined(ENABLE_MMAP) && defined(__unix__)
+#if defined(ENABLE_MMAP) && defined(_POSIX_MAPPED_FILES)
 
 Mmap *mopen(const char *path, const char *mode)
 {
@@ -1561,12 +1581,12 @@ Mmap *mopen(const char *path, const char *mode)
 		}
 #ifdef INTERNAL_ERROR_HANDLING
 	i = xopen(path, o_flags);
-#if ! defined(__linux__) || ! defined(_GNU_SOURCE)
+#if (! defined(__linux__)) || (! defined(_GNU_SOURCE))
 	if(fcntl(i, F_SETFD, FD_CLOEXEC) != 0) {
 		log_message(LOG_FATAL, "Failed setting FD_CLOEXEC flag on file descriptor: %s", strerror(errno));
 		exit(EXIT_FAILURE);
 	}
-#endif /* #if ! defined(__linux__) || ! defined(_GNU_SOURCE) */
+#endif /* #if (! defined(__linux__)) || (! defined(_GNU_SOURCE)) */
 	if(unlikely((offset = lseek(i, 0, SEEK_END)) == -1)) {
 		perror("Error obtaining file size");
 		exit(EXIT_FAILURE);
@@ -1614,7 +1634,8 @@ size_t mread(void *ptr, size_t size, size_t nmemb, Mmap *f)
 {
 	size_t rsize = size * nmemb;
 
-	if(unlikely(f == NULL || f->ptr == NULL || f->offset == NULL || f->endptr == NULL))
+	if(unlikely(f == NULL || f->ptr == NULL ||
+				f->offset == NULL || f->endptr == NULL))
 		errno = EBADF;
 	else {
 		if(f->offset + size * nmemb >= f->endptr)
@@ -1633,7 +1654,8 @@ size_t mwrite(void *ptr, size_t size, size_t nmemb, Mmap *f)
 {
 	size_t wsize = size * nmemb;
 
-	if(unlikely(f == NULL || f->ptr == NULL || f->offset == NULL || f->endptr == NULL))
+	if(unlikely(f == NULL || f->ptr == NULL ||
+				f->offset == NULL || f->endptr == NULL))
 		errno = EBADF;
 	else {
 		if(f->offset + size * nmemb >= f->endptr)
@@ -1649,7 +1671,8 @@ int mgetc(Mmap *f)
 {
 	int ret = EOF;
 
-	if(unlikely(f == NULL || f->ptr == NULL || f->offset == NULL || f->endptr == NULL))
+	if(unlikely(f == NULL || f->ptr == NULL ||
+				f->offset == NULL || f->endptr == NULL))
 		errno = EBADF;
 	else
 		ret = f->offset < f->endptr ? (int) *f->offset++ :  EOF;
@@ -1670,7 +1693,8 @@ char *mgets(char *s, int size, Mmap *f)
 	int i = 0;
 	char *ret = (char*) NULL;
 
-	if(unlikely(f == NULL || f->ptr == NULL || f->offset == NULL || f->endptr == NULL))
+	if(unlikely(f == NULL || f->ptr == NULL ||
+				f->offset == NULL || f->endptr == NULL))
 		errno = EBADF;
 	else if(f->offset < f->endptr) {
 		while(i < size && f->offset < f->endptr) {
@@ -1688,7 +1712,8 @@ int mungetc(int c, Mmap *f)
 {
 	int ret = EOF;
 
-	if(unlikely(f == NULL || f->ptr == NULL || f->offset == NULL || f->endptr == NULL))
+	if(unlikely(f == NULL || f->ptr == NULL ||
+				f->offset == NULL || f->endptr == NULL))
 		errno = EBADF;
 	else if(f->offset >= f->ptr) {
 		*f->offset = c;
@@ -1738,7 +1763,8 @@ int mprintf(Mmap *f, const char *fmt, ...)
 	int ret = -1;
 
 	failwith("this function can cause buffer overflows in its current implementation");
-	if(unlikely(f == NULL || f->ptr == NULL || f->offset == NULL || f->endptr == NULL))
+	if(unlikely(f == NULL || f->ptr == NULL ||
+				f->offset == NULL || f->endptr == NULL))
 		errno = EBADF;
 	else {
 		va_start(ap, fmt);
@@ -1756,7 +1782,8 @@ int mnprintf(Mmap *f, size_t size, const char *fmt, ...)
 	va_list ap;
 	int ret = -1;
 
-	if(unlikely(f == NULL || f->ptr == NULL || f->offset == NULL || f->endptr == NULL))
+	if(unlikely(f == NULL || f->ptr == NULL ||
+				f->offset == NULL || f->endptr == NULL))
 		errno = EBADF;
 	else {
 		size = int_max(size, f->ptr - f->offset);
@@ -1773,7 +1800,8 @@ off_t mseek(Mmap *f, off_t offset, int whence)
 {
 	off_t ret = (off_t) -1;
 
-	if(unlikely(f == NULL || f->ptr == NULL || f->offset == NULL || f->endptr == NULL))
+	if(unlikely(f == NULL || f->ptr == NULL ||
+				f->offset == NULL || f->endptr == NULL))
 		errno = EBADF;
 	else
 		switch(whence) {
@@ -1786,8 +1814,8 @@ off_t mseek(Mmap *f, off_t offset, int whence)
 			case SEEK_END:
 				ret = (off_t) (f->offset = f->endptr + offset);
 				break;
-#if defined(_GNU_SOURCE) && ((defined(__linux__) && LINUX_VERSION_CODE >=\
-			KERNEL_VERSION(3, 1, 0)) || defined(__DragonFly__) ||\
+#if defined(_GNU_SOURCE) && (( defined(__linux__) && LINUX_VERSION_CODE >=\
+			KERNEL_VERSION(3, 1, 0) ) || defined(__DragonFly__) ||\
 		defined(__FreeBSD__) || (defined(__sun) && defined(__SVR4)))
 /* man lseek(3) for compatibility. Current compatibility (2016/01/11) includes
  * GNU-Linux for kernels 3.1.0+, DragonFlyBSD, FreeBSD and Solaris */
@@ -1827,7 +1855,7 @@ int mclose(Mmap *f)
 	return ret;
 }
 
-#endif /* #if defined(ENABLE_MMAP) && defined(__unix__) */
+#endif /* #if defined(ENABLE_MMAP) && defined(_POSIX_MAPPED_FILES) */
 
 /* -------------------- Misc functions -------------------- */
 #ifdef ENABLE_MISC
@@ -1911,7 +1939,7 @@ unsigned int gcd(unsigned int u, unsigned int v)
 		/* Now u and v are both odd. Swap if necessary so u <= v,
 		   then set v = v - u (which is even). */
 		if (u > v)
-			SWAP(u, v, unsigned int);
+			swap(u, v, unsigned int);
 		v -= u;
 	} while(v != 0);
 

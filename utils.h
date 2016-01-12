@@ -76,18 +76,15 @@
  * line.
  * -------------------------------------------------------------------------- */
 
-/* Operating system detection macros:
- * http://nadeausoftware.com/articles/2012/01/c_c_tip_how_use_compiler_predefined_macros_detect_operating_system */
-
 #if defined(__STDC__)
 # define C89
 # if defined(__STDC_VERSION__)
 #  define C90
-#  if (__STDC_VERSION__ >= 199901L) && ! defined C99
+#  if (__STDC_VERSION__ >= 199901L) && (! defined C99)
 #   define C99
-#  endif
-# endif
-#endif
+#  endif /* #  if (__STDC_VERSION__ >= 199901L) && (! defined C99) */
+# endif /* # if defined(__STDC_VERSION__) */
+#endif /* #if defined(__STDC__) */
 
 #ifdef __GNUC__
 # define likely(x)	__builtin_expect(!!(x), 1)
@@ -95,11 +92,32 @@
 #else
 # define likely(x)	(x)
 # define unlikely(x)	(x)
-#endif
+#endif /* #ifdef __GNUC__ */
+
+/* Operating system detection macros:
+ * http://nadeausoftware.com/articles/2012/01/c_c_tip_how_use_compiler_predefined_macros_detect_operating_system */
+
+/* Generic macro for detecting Unix systems */
+#if (defined(__unix) || defined(__MACH__)) && (! defined(__unix__))
+# define __unix__
+#endif /* #if (defined(__unix) || defined(__MACH__)) && (! defined(__unix__)) */
+
+
+/* Generic macro for detecting BSD-type operating systems */
+#if (defined(__DragonFly__) || defined(__FreeBSD__) || defined(__NetBSD__)\
+		|| defined(__OpenBSD__) || defined(__bsdi__)) && (! defined(BSD))
+# define BSD
+#endif /* #if (defined(__DragonFly__) || defined(__FreeBSD__) || defined(__NetBSD__) ||\
+	  defined(__OpenBSD__) || defined(__bsdi__)) && (! defined(BSD)) */
 
 #ifdef __unix__
 # define _GNU_SOURCE
-#endif
+#endif /* #ifdef __unix__ */
+
+/* fix KERNEL_VERSION() macro preprocessing errors */
+#ifndef __linux__
+# define KERNEL_VERSION(x, y, z)	0
+#endif /* #if defined(__sun) && defined(__SVR4) */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -123,7 +141,7 @@ extern int errno;
 #  include <stdbool.h>
 # else
    typedef enum { false = 0, true = 1 } bool;
-# endif
+# endif /* ifdef C99 */
 #else
 # define BOOL_FALSE 0
 # define BOOL_TRUE 1
@@ -155,7 +173,7 @@ BOOL_TYPE is_allocated(const void *ptr);
 
 /* if you're too lazy to do like in the previous example, this function does it for you */
 void xfree(void *ptr);
-#endif
+#endif /* #ifdef MANAGE_MEM */
 
 
 
@@ -232,6 +250,14 @@ void str_tolower(char *str);
 /* sets str to upper case */
 void str_toupper(char *str);
 
+#if (! defined(__linux__)) && (! defined(BSD))
+char *stpcpy(char *dest, const char *src);
+#endif /* #if (! defined(__linux__)) && (! defined(BSD)) */
+
+#ifndef __linux__
+char *strchrnul(const char *s, int c);
+#endif /* #ifndef __linux__ */
+
 #ifdef C99
 #include <stdarg.h>
 /* __VA_ARGS__ is not available for macros before the C99 standard
@@ -239,13 +265,11 @@ void str_toupper(char *str);
  * http://stackoverflow.com/questions/5588855/standard-alternative-to-gccs-va-args-trick
  */
 
-#ifdef C99
 /* Appends together all string args passed as parameters.
  * free() when done */
 char *const_append(const char *str, ...);
 
 #define const_append(...)		const_append(__VA_ARGS__, (char*) NULL)
-#endif /* #ifdef C99 */
 
 /* Following workaround for C89 won't work:
  * foo = const_append("bar", "baz");
@@ -341,8 +365,9 @@ char *str_join(int str_array_size, char **str_array, char *separator);
 /* reads a complete line (no length limit) from file.
  * free() buffer when done. As an alternative, look up getline(3) */
 char *read_line(FILE *stream);
+
 /* for compatibility with old code. Deprecated */
-#define readLine	read_line
+/* #define readLine	read_line */
 
 /* Use fgets without a preallocated buffer. free() when done */
 #define afgets(stream) getline(NULL, 0, (stream))
@@ -398,8 +423,14 @@ int togglebit(bitset set, int pos);
 #include <sys/stat.h>
 #endif /* #ifdef __unix__ */
 
+/* get modern readdir_r function prototype on solaris */
+#if defined(__sun) && defined(__SVR4)
+# define _POSIX_C_SOURCE 199506L
+#endif /* #if defined(__sun) && defined(__SVR4) */
+
 #include <dirent.h>
 #include <stdarg.h>
+#include <limits.h>
 
 int is_dir(const char *path);
 
@@ -433,8 +464,8 @@ void *dirwalk(const char *path, void *(*func)(void *arg, char *path), void *arg)
 /* -------------------- Networking functions -------------------- */
 #ifdef ENABLE_NETWORKING
 
-#include <sys/socket.h>
 #include <sys/types.h>
+#include <sys/socket.h>
 #include <arpa/inet.h>
 #include <netdb.h>
 
@@ -661,7 +692,7 @@ void log_message(log_level_t level, const char *format, ... );
 void failwith(const char *errmsg, ...);
 
 /* swap variables a and b. Both a and b must be of type TYPE */
-#define SWAP(a, b, TYPE) {\
+#define swap(a, b, TYPE) {\
 	TYPE __tmp__ = a;\
 	a = b;\
 	b = __tmp__;\
