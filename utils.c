@@ -315,7 +315,12 @@ int xopen(const char *path, int flags, ...)
 	int fd, count = 0, mode = 0;
 	va_list ap;
 
-	if(flags & O_CREAT || flags & O_TMPFILE) {
+#if defined(__linux__) && (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 1, 0))
+	if(flags & O_CREAT || flags & O_TMPFILE)
+#else
+	if(flags & O_CREAT)
+#endif /* #if defined(__linux__) && LINUX_VERSION_CODE <= KERNEL_VERSION(3, 1, 0) */
+	{
 		va_start(ap, flags);
 		mode = va_arg(ap, mode_t);
 		va_end(ap);
@@ -476,7 +481,6 @@ char *const_append(const char *str, ...)
 
 	return new_str;
 }
-#endif /* #ifdef C99 */
 
 #undef append
 char *append(char *str, ...)
@@ -513,6 +517,7 @@ char *append(char *str, ...)
 
 	return new_str;
 }
+#endif /* #ifdef C99 */
 
 char *extract(const char *str, char start, char end)
 {
@@ -647,8 +652,8 @@ char *erase_str(const char *str, size_t pos, size_t len)
 		new_str = (char*) malloc(new_len);
 		if(new_str != (char*) NULL) {
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
-		memcpy(new_str, str, pos);
-		memcpy(new_str + pos, str + pos + len, new_len - pos);
+			memcpy(new_str, str, pos);
+			memcpy(new_str + pos, str + pos + len, new_len - pos);
 #ifndef INTERNAL_ERROR_HANDLING
 		}
 #endif /* #ifndef INTERNAL_ERROR_HANDLING */
@@ -1781,18 +1786,26 @@ off_t mseek(Mmap *f, off_t offset, int whence)
 			case SEEK_END:
 				ret = (off_t) (f->offset = f->endptr + offset);
 				break;
-#ifdef __unix__
+#if defined(_GNU_SOURCE) && ((defined(__linux__) && LINUX_VERSION_CODE >=\
+			KERNEL_VERSION(3, 1, 0)) || defined(__DragonFly__) ||\
+		defined(__FreeBSD__) || (defined(__sun) && defined(__SVR4)))
+/* man lseek(3) for compatibility. Current compatibility (2016/01/11) includes
+ * GNU-Linux for kernels 3.1.0+, DragonFlyBSD, FreeBSD and Solaris */
 			case SEEK_DATA:
-				if(f->offset > f->endptr)
+				if(f->offset >= f->endptr || f->offset + offset >= f->endptr)
 					errno = ENXIO;
-				ret = (off_t) (f->offset += offset);
+				else
+					ret = (off_t) (f->offset += offset);
 				break;
 			case SEEK_HOLE:
-				if(f->offset > f->endptr)
+				if(f->offset >= f->endptr || f->endptr + offset > f->endptr)
 					errno = ENXIO;
-				ret = (off_t) (f->offset = f->endptr + offset);
+				else
+					ret = (off_t) (f->offset = f->endptr + offset);
 				break;
-#endif /* #ifdef __unix__ */
+#endif /* #if defined(_GNU_SOURCE) && ((defined(__linux__) && LINUX_VERSION_CODE >=\
+			KERNEL_VERSION(3, 1, 0)) || defined(__DragonFly__) ||\
+		defined(__FreeBSD__) || (defined(__sun) && defined(__SVR4))) */
 			default:
 				errno = EINVAL;
 		}
@@ -1803,7 +1816,8 @@ int mclose(Mmap *f)
 {
 	int ret = 0;
 
-	if(unlikely(f == NULL || f->ptr == NULL || f->offset == NULL || f->endptr == NULL)) {
+	if(unlikely(f == NULL || f->ptr == NULL
+				|| f->offset == NULL || f->endptr == NULL)) {
 		errno = EBADF;
 		ret = EOF;
 	}
