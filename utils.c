@@ -959,7 +959,7 @@ char *read_file_descriptor(int fd)
 		if(ret < 0)
 			break;
 		i += ret;
-		if(i == current_size) {
+		if(i == (ssize_t) current_size) {
 #ifdef INTERNAL_ERROR_HANDLING
 			str = xrealloc(str, current_size <<= 1);
 #else
@@ -968,7 +968,7 @@ char *read_file_descriptor(int fd)
 				return (char*) NULL;
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
 		}
-	} while(i << 1 == current_size);
+	} while(i << 1 == (ssize_t) current_size);
 
 	if(ret == -1) {
 		free(str);
@@ -977,12 +977,12 @@ char *read_file_descriptor(int fd)
 		/* allocate precisely as much memory (not a single byte more)
 		 * as is needed to contain the data */
 #ifdef INTERNAL_ERROR_HANDLING
-		if(i == current_size)
+		if(i == (ssize_t) current_size)
 			str = (char*) xrealloc(str, current_size += 1);
 		else
 			str = (char*) xrealloc(str, i + 1);
 #else
-		if(i == current_size)
+		if(i == (ssize_t) current_size)
 			str = (char*) realloc(str, current_size += 1);
 		else
 			str = (char*) realloc(str, i + 1);
