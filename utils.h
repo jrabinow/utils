@@ -25,36 +25,47 @@
  * this feature:
  * https://lkml.org/lkml/2013/8/31/138 */
 /* #define ENABLE_BOOL_TYPE */
+
 /* Enables memory management such as heap memory identification. Planned: leak
- * detection and related */
+ * detection and related. Very primitive at this time, I recommend not using this until
+ * properly implemented */
 /* #define MANAGE_MEM */
+
 /* define error "squashing" functions. Program exits if error happens. Use sparingly
  * if your application must meet certain robustness requirements */
 #define ENABLE_ERROR_HANDLING
+
 /* Various string manipulation functions */
 #define ENABLE_STRING_MANIPULATION
+
 /* Easily read data from streams/file descriptors */
 #define ENABLE_READ_DATA
-/* Bitset */
-#define ENABLE_BITSET
+
+/* Data structures: double linked list, stack, queue, bitset */
+#define ENABLE_DATASTRUCTS
+
 /* Directory navigation functions */
 #define ENABLE_FILESYSTEM
+
 /* Networking related functions */
 #define ENABLE_NETWORKING
-/* Terminal manipulation functions, as well as color text printing */
-/* Will not work on windows machine */
+
+/* Terminal manipulation functions, as well as color text printing
+ * Will not work with compatible terminals and terminal emulators */
 #define ENABLE_TERMIOS_MANIPULATION
-/* Threading functions */
+
+/* Threading functions. Still very basic */
 /* #define ENABLE_THREADING */
+
 /* Memory pool, to cache heap memory and avoid having to call malloc. Idea is that
  * we often ask for same memory sizes (nodes in a linked list or tree, data structures
  * each requiring the same amount of memory...). This memory pool reduces overhead caused
- * by memory allocation and enormously improves memory locality.
- * This implementation is highly experimental and suffers from a few limitations. Proceed
- * with caution */
-/*#define ENABLE_MEMPOOL */
-/* High-level mmap */
+ * by memory allocation as well as enormously improving memory locality */
+#define ENABLE_MEMPOOL
+
+/* High-level mmap. Still experimental */
 #define ENABLE_MMAP
+
 /* miscellaneous functions */
 #define ENABLE_MISC
 
@@ -66,11 +77,8 @@
 # define USING_VALGRIND
 #endif /* ifdef MANAGE_MEM */
 
-/* whether to quit when encountering an error, or report it back to the user.
- * Depends on ENABLE_ERROR_HANDLING being enabled */
-#ifdef ENABLE_ERROR_HANDLING
-# define INTERNAL_ERROR_HANDLING
-#endif /* ifdef ENABLE_ERROR_HANDLING */
+/* whether to quit when encountering an error, or report it back to the user */
+#define INTERNAL_ERROR_HANDLING
 
 /* Library configuration done. You shouldn't need to modify anything below this
  * line.
@@ -336,7 +344,7 @@ char *neg_strchr(const char *s, int c);
  * per array element.
  * return value is size of array.
  * free() *return_array, (*return_array)[0], (*return_array)[1] ... when done.
- * In case of error, *return_array is NULL and errno is set appropriately */
+ * In case of error, returns 0, *return_array is NULL and errno is set appropriately */
 size_t split_str(const char *str, char separator, char ***return_array);
 
 /* Same thing as split_str, except that elements in return_array are pointers to locations
@@ -344,7 +352,7 @@ size_t split_str(const char *str, char separator, char ***return_array);
  * modified (each separator char is replaced by a '\0')
  * This function is more efficient as there is no data copying involved, and the only
  * allocated memory is *return_array
- * In case of error, *return_array is NULL and errno is set appropriately */
+ * In case of error, returns 0, *return_array is NULL and errno is set appropriately */
 size_t split_str_lite(char *str, char separator, char ***return_array);
 
 /* joins all strings in str_array. All strings are joined end to end with a separator
@@ -400,10 +408,95 @@ char *read_file_descriptor(int fd);
 
 
 
-/* -------------------- BITSETTING -------------------- */
-#ifdef ENABLE_BITSET
+/* -------------------- Memory pool -------------------- */
+#ifdef ENABLE_MEMPOOL
+
+struct mempool {
+	void *mem, **ptrs;
+	size_t size, nmemb, index;
+};
+
+/* create memory pool of nmemb elements, each of size size. If internal error
+ * handling is disabled and this function fails, mp->size = 0 */
+void new_mempool(struct mempool *mp, size_t size, size_t nmemb);
+
+/* obtain one element from the mempool
+ * Returns pointer to valid element space on success and NULL on failure. See
+ * implementation comment for details */
+void *mempool_alloc(struct mempool *mp);
+
+/* free the memory pointed to by ptr back into the memory pool */
+void mempool_free(struct mempool *mp, void *ptr);
+
+/* once done using the memory pool, delete it */
+void delete_mempool(struct mempool *mp);
+
+#endif /* #ifdef ENABLE_MEMPOOL */
+
+
+
+/* -------------------- DATA STRUCTURES -------------------- */
+#ifdef ENABLE_DATASTRUCTS
 #include <malloc.h>
 
+typedef struct __datastruct_elem__ {
+	void *data;
+	struct __datastruct_elem__ *next;
+} __datastruct_elem__;
+
+typedef struct __datastruct__ {
+	__datastruct_elem__ *in, *out;
+} __datastruct__;
+
+/* ----- Double linked list ----- */
+typedef __datastruct__* DLinkedList;
+
+DLinkedList new_dlinkedlist(void);
+void delete_dlinkedlist(DLinkedList dl, void (*__del__)(void*));
+
+void *dll_add(DLinkedList dl, void *data);
+void *dll_remove(DLinkedList dl);
+
+void dll_rewind(DLinkedList dl);
+void *dll_iterate(DLinkedList dl);
+void *dll_rev_iterate(DLinkedList dl);
+void *dll_head(DLinkedList dl);
+DLinkedList dll_tail(DLinkedList dl);
+DLinkedList dll_copy_interator(DLinkedList dl);
+/*
+DLinkedList dll_clone(DLinkedList dl, void *(*__clonefunc__)(void*));
+DLinkedList dll_join(DLinkedList dl1, DLinkedList dl2);
+DLinkedList dll_filter(DLinkedList dl, BOOL_TYPE (*__filterfunc__)(void*))
+void dll_sort(DLinkedList dl, int (*__cmp__)(void *d1, void *d2));
+*/
+void *dll_map(DLinkedList dl, void *(*__mapfunc__)(void *data, void *arg), void *arg);
+
+
+/* ----- Stack ----- */
+typedef __datastruct_elem__* Stack;
+
+#define new_stack()	(Stack) NULL
+void delete_stack(Stack s, void (*__del__)(void*));
+
+void *stack_push(Stack *s, void *data);
+void *stack_pop(Stack *s);
+void *stack_peek(Stack s);
+
+/* for a consistent interface */
+#define stack_push(s, __del__)	stack_push(&(s), (__del__))
+#define stack_pop(s)		stack_pop(&(s))
+
+/* ----- Queue ----- */
+typedef __datastruct__* Queue;
+
+Queue new_queue(void);
+void delete_queue(Queue q, void (*__del__)(void*));
+
+void queue_push(Queue q, void *data);
+void *queue_pop(Queue q);
+void *queue_peek(Queue q);
+
+/* ----- Bitset ----- */
 typedef byte *bitset;
 
 bitset new_bitset(size_t size);
@@ -422,7 +515,7 @@ void unsetbit(bitset set, int pos);
 /* flip bit at position pos */
 int togglebit(bitset set, int pos);
 
-#endif /* #ifdef ENABLE_BITSET */
+#endif /* #ifdef ENABLE_DATASTRUCTS */
 
 
 
@@ -569,33 +662,6 @@ void *xpthread_join(pthread_t thread);
 
 
 
-/* -------------------- Memory pool -------------------- */
-#ifdef ENABLE_MEMPOOL
-
-struct mempool {
-	void *mem, **ptrs;
-	size_t size, nmemb, index;
-};
-
-/* create memory pool of nmemb elements, each of size size. If internal error
- * handling is disabled and this function fails, mp->size = 0 */
-void mempool_create(struct mempool *mp, size_t size, size_t nmemb);
-
-/* obtain one element from the mempool
- * Returns pointer to valid element space on success and NULL on failure. See
- * implementation comment for details */
-void *mempool_alloc(struct mempool *mp);
-
-/* free the memory pointed to by ptr back into the memory pool */
-void mempool_free(struct mempool *mp, void *ptr);
-
-/* once done using the memory pool, delete it */
-void mempool_delete(struct mempool *mp);
-
-#endif /* #ifdef ENABLE_MEMPOOL */
-
-
-
 /* -------------------- High-level mmap() -------------------- */
 #if defined(ENABLE_MMAP) && defined(__unix__)
 
@@ -603,7 +669,7 @@ void mempool_delete(struct mempool *mp);
 #include <sys/mman.h>
 
 typedef struct {
-	  char *ptr, *offset, *endptr;
+	byte *ptr, *offset, *endptr;
 } Mmap;
 
 /* Map file to memory space. Mode can contain any of the characters 'r', 'w' or 'x'

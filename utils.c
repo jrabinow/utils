@@ -19,9 +19,9 @@
 
 /* -------------------- MEMORY MANAGEMENT -------------------- */
 #ifdef MANAGE_MEM
-static void *heap_bottom = NULL, *heap_top = NULL;
+static void *heap_bottom = (void*) NULL, *heap_top = (void*) NULL;
 #ifdef USING_VALGRIND
-static void *__initial_alloc__ = NULL;
+static void *__initial_alloc__ = (void*) NULL;
 
 static void __clean_initial_alloc(void)
 {
@@ -34,7 +34,7 @@ void init_alloc(void)
 	int count = 0;
 	do {
 		heap_bottom = heap_top = malloc(1);
-		if(unlikely(heap_bottom == NULL))
+		if(unlikely(heap_bottom == (void*) NULL))
 			switch(errno) {
 				case ENOMEM:
 					log_message(LOG_ERROR, "Error allocating memory: %s", strerror(errno));
@@ -50,7 +50,7 @@ void init_alloc(void)
 					log_message(LOG_FATAL, "Error allocating memory: %s", strerror(errno));
 					exit(EXIT_FAILURE);
 			}
-	} while(heap_bottom == NULL);
+	} while(unlikely(heap_bottom == (void*) NULL));
 #ifdef USING_VALGRIND
 	__initial_alloc__ = heap_bottom;
 	if(atexit(&__clean_initial_alloc)) {
@@ -76,12 +76,12 @@ void xfree(void *ptr)
 #if defined(ENABLE_ERROR_HANDLING) || defined(INTERNAL_ERROR_HANDLING)
 void *xmalloc(size_t size)
 {
-	void *ptr = NULL;
+	void *ptr = (void*) NULL;
 	int count = 0;
 
 	do {
 		ptr = malloc(size);
-		if(likely(ptr != NULL))
+		if(likely(ptr != (void*) NULL))
 			break;
 #ifdef __unix__
 		switch(errno) {
@@ -115,12 +115,12 @@ void *xmalloc(size_t size)
 
 void *xcalloc(size_t nmemb, size_t size)
 {
-	void *ptr = NULL;
+	void *ptr = (void*) NULL;
 	int count = 0;
 
 	do {
 		ptr = calloc(nmemb, size);
-		if(likely(ptr != NULL))
+		if(likely(ptr != (void*) NULL))
 			break;
 #ifdef __unix__
 		switch(errno) {
@@ -197,7 +197,7 @@ void *xrealloc(void *ptr, size_t size)
 
 	do {
 		ptr = realloc(ptr, size);
-		if(likely(ptr != NULL))
+		if(likely(ptr != (void*) NULL))
 			break;
 #ifdef __unix__
 		switch(errno) {
@@ -515,7 +515,7 @@ char *append(char *str, ...)
 	if( ! is_allocated(str1))
 		return va_const_append(str, ap);
 #endif /* #if defined(MANAGE_MEM) && defined(C99) */
-	while((ptr = va_arg(ap, char*)) != NULL)
+	while((ptr = va_arg(ap, char*)) != (char*) NULL)
 		len += strlen(ptr);
 	len++;
 	va_end(ap);
@@ -528,7 +528,7 @@ char *append(char *str, ...)
 		va_start(ap, str);
 		ptr = new_str + orig_len;
 		/* avoid overflow by doing the calculation in 2 steps */
-		while((str = va_arg(ap, char*)) != NULL)
+		while((str = va_arg(ap, char*)) != (char*) NULL)
 			ptr = stpcpy(ptr, str);
 		va_end(ap);
 #ifndef INTERNAL_ERROR_HANDLING
@@ -711,7 +711,7 @@ char *replace_str(const char *haystack, const char *needle, const char *replacem
 
 const char *rev_strpbrk(const char *str, const char *accept)
 {
-	const char *ptr = NULL, *iter = str;
+	const char *ptr = (const char*) NULL, *iter = str;
 
 	for(iter = str; *iter != '\0'; iter++)
 		if(strchr(accept, *iter))
@@ -751,7 +751,7 @@ size_t split_str(const char *str, char separator, char ***return_array)
 	*return_array = (char**) xmalloc(count * sizeof(char*));
 #else
 	*return_array = (char**) malloc(count * sizeof(char*));
-	if(*return_array == (char**) NULL)
+	if(unlikely(*return_array == (char**) NULL))
 		return 0;
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
 
@@ -765,7 +765,7 @@ size_t split_str(const char *str, char separator, char ***return_array)
 				(*return_array)[count] = (char*) xmalloc(i + 1);
 #else
 				(*return_array)[count] = (char*) malloc(i + 1);
-				if((*return_array)[count] == (char*) NULL) {
+				if(unlikely((*return_array)[count] == (char*) NULL)) {
 					for(; count > 0; count--)
 						free((*return_array)[count - 1]);
 					free(*return_array);
@@ -776,7 +776,8 @@ size_t split_str(const char *str, char separator, char ***return_array)
 				memcpy((*return_array)[count], str, i);
 				(*return_array)[count++][i] = '\0';
 				str += i+1;
-			}	/* COMMENT THIS LINE TO NOT SKIP OVER CONSECUTIVE SEPARATORS */
+			/* COMMENT THE NEXT LINE TO NOT SKIP OVER CONSECUTIVE SEPARATORS */
+			}
 			i = -1;
 		}
 	}
@@ -785,7 +786,7 @@ size_t split_str(const char *str, char separator, char ***return_array)
 		(*return_array)[count] = (char*) xmalloc(i + 1);
 #else
 		(*return_array)[count] = (char*) malloc(i + 1);
-		if((*return_array)[count] == (char*) NULL) {
+		if(unlikely((*return_array)[count] == (char*) NULL)) {
 			for(; count > 0; count--)
 				free((*return_array)[count - 1]);
 			free(*return_array);
@@ -824,7 +825,7 @@ size_t split_str_lite(char *str, char separator, char ***return_array)
 	*return_array = (char**) xmalloc(count * sizeof(char*));
 #else
 	*return_array = (char**) malloc(count * sizeof(char*));
-	if(*return_array == (char**) NULL)
+	if(unlikely(*return_array == (char**) NULL))
 		return 0;
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
 
@@ -862,7 +863,7 @@ char* str_join(int str_array_size, char **str_array, char *separator)
 #else
 	str = (char *) malloc((total_len + separator_len *
 				(str_array_size - 1) + 1) * sizeof(char));
-	if(str == (char *) NULL)
+	if(unlikely(str == (char *) NULL))
 		return (char *) NULL;
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
 
@@ -890,7 +891,7 @@ char *read_line(FILE *stream)
 	char *str = (char*) xmalloc(current_size);
 #else
 	char *str = (char*) malloc(current_size);
-	if(str == (char*) NULL)
+	if(unlikely(str == (char*) NULL))
 		return (char*) NULL;
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
 
@@ -906,7 +907,7 @@ char *read_line(FILE *stream)
 				str = (char*) xrealloc(str, current_size <<= 1);
 #else
 				str = (char*) realloc(str, current_size <<= 1);
-				if(str == (char*) NULL)
+				if(unlikely(str == (char*) NULL))
 					return (char*) NULL;
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
 			}
@@ -920,10 +921,10 @@ char *read_line(FILE *stream)
 		str = (char*) xrealloc(str, current_size += 1);
 #else
 		str = (char*) realloc(str, current_size += 1);
-		if(str == (char*) NULL)
+		if(unlikely(str == (char*) NULL))
 			return (char*) NULL;
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
-	} else if(c == EOF && i == 0) {
+	} else if(unlikely(c == EOF && i == 0)) {
 		free(str);
 		return (char*) NULL;
 	} else {
@@ -931,7 +932,7 @@ char *read_line(FILE *stream)
 		str = xrealloc(str, i + 1);
 #else
 		str = realloc(str, i + 1);
-		if(str == (char*) NULL)
+		if(unlikely(str == (char*) NULL))
 			return (char*) NULL;
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
 	}
@@ -947,7 +948,7 @@ char *read_file_descriptor(int fd)
 	char *str = (char*) xmalloc(current_size);
 #else
 	char *str = (char*) malloc(current_size);
-	if(str == (char*) NULL)
+	if(unlikely(str == (char*) NULL))
 		return (char*) NULL;
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
 
@@ -956,7 +957,7 @@ char *read_file_descriptor(int fd)
 	 * are available */
 	do {
 		ret = read(fd, str + i, current_size - i);
-		if(ret < 0)
+		if(unlikely(ret < 0))
 			break;
 		i += ret;
 		if(i == (ssize_t) current_size) {
@@ -964,7 +965,7 @@ char *read_file_descriptor(int fd)
 			str = xrealloc(str, current_size <<= 1);
 #else
 			str = realloc(str, current_size <<= 1);
-			if(str == (char*) NULL)
+			if(unlikely(str == (char*) NULL))
 				return (char*) NULL;
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
 		}
@@ -986,7 +987,7 @@ char *read_file_descriptor(int fd)
 			str = (char*) realloc(str, current_size += 1);
 		else
 			str = (char*) realloc(str, i + 1);
-		if(str == (char*) NULL)
+		if(unlikely(str == (char*) NULL))
 			return (char*) NULL;
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
 	}
@@ -995,9 +996,372 @@ char *read_file_descriptor(int fd)
 #endif /* #ifdef ENABLE_READ_DATA */
 
 
-/* -------------------- BITSETTING -------------------- */
-#ifdef ENABLE_BITSET
+/* -------------------- DATA STRUCTURES -------------------- */
+#ifdef ENABLE_DATASTRUCTS
 
+/* ----- Double-linked list ----- */
+DLinkedList new_dlinkedlist(void)
+{
+#ifdef INTERNAL_ERROR_HANDLING
+	DLinkedList dl = (DLinkedList) xmalloc(sizeof(__datastruct__));
+#else
+	DLinkedList dl = (DLinkedList) malloc(sizeof(__datastruct__));
+	if(likely(dl != (DLinkedList) NULL))
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
+		dl->in = dl->out = (__datastruct_elem__*) NULL;
+	return dl;
+}
+
+void delete_dlinkedlist(DLinkedList dl, void (*__del__)(void*))
+{
+	__datastruct_elem__ *e = dl->in, *next;;
+	if(__del__ != (void(*)(void*)) NULL) {
+		while(e != (__datastruct_elem__*) NULL) {
+			__del__(e->data);
+			next = e->next;
+			free(e);
+			e = next;
+		}
+		e = dl->out;
+		while(e != (__datastruct_elem__*) NULL) {
+			__del__(e->data);
+			next = e->next;
+			free(e);
+			e = next;
+		}
+	} else {
+		while(e != (__datastruct_elem__*) NULL) {
+			next = e->next;
+			free(e);
+			e = next;
+		}
+		e = dl->out;
+		while(e != (__datastruct_elem__*) NULL) {
+			next = e->next;
+			free(e);
+			e = next;
+		}
+	}
+}
+
+void *dll_add(DLinkedList dl, void *data)
+{
+#ifdef INTERNAL_ERROR_HANDLING
+	__datastruct_elem__ *e = (__datastruct_elem__*) xmalloc(sizeof(__datastruct_elem__));
+#else
+	__datastruct_elem__ *e = (__datastruct_elem__*) malloc(sizeof(__datastruct_elem__));
+	if(likely(e != (__datastruct_elem__*) NULL)) {
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
+		e->data = data;
+		e->next = dl->out;
+		dl->out = e;
+		return data;
+#ifndef INTERNAL_ERROR_HANDLING
+	} else
+		return (void*) NULL;
+#endif /* #ifndef INTERNAL_ERROR_HANDLING */
+}
+
+void *dll_remove(DLinkedList dl)
+{
+	void *data = (void*) NULL;
+	__datastruct_elem__ *e = dl->out;
+
+	if(e != (__datastruct_elem__*) NULL) {
+		dl->out = e->next;
+		free(e);
+	}
+	return data;
+}
+
+void dll_rewind(DLinkedList dl)
+{
+	__datastruct_elem__ *e = dl->in;
+
+	while(e != (__datastruct_elem__*) NULL) {
+		dl->in = e->next;
+		e->next = dl->out;
+		dl->out = e;
+	}
+}
+
+void *dll_iterate(DLinkedList dl)
+{
+	void *data = (void*) NULL;
+	__datastruct_elem__ *e = dl->out;
+
+	if(e != (__datastruct_elem__*) NULL) {
+		data = e->data;
+		dl->out = e->next;
+		e->next = dl->in;
+		dl->in = e;
+	}
+	return data;
+}
+
+void *dll_rev_iterate(DLinkedList dl)
+{
+	void *data = (void*) NULL;
+	__datastruct_elem__ *e = dl->in;
+
+	if(dl->out != (__datastruct_elem__*) NULL)
+		data = dl->out->data;
+	if(e != (__datastruct_elem__*) NULL) {
+		dl->in = e->next;
+		e->next = dl->out;
+		dl->out = e;
+	}
+	return data;
+}
+
+void *dll_head(DLinkedList dl)
+{
+	return dl->out != (__datastruct_elem__*) NULL ? dl->out->data : (void*) NULL;
+}
+
+DLinkedList dll_tail(DLinkedList dl)
+{
+#ifdef INTERNAL_ERROR_HANDLING
+	DLinkedList tl = (DLinkedList) xmalloc(sizeof(__datastruct__));
+#else
+	DLinkedList tl = (DLinkedList) malloc(sizeof(__datastruct__));
+	if(likely(tl != (DLinkedList) NULL)) {
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
+		tl->in = dl->out;
+		if(tl->in != (__datastruct_elem__*) NULL)
+			tl->out = tl->in->next;
+#ifndef INTERNAL_ERROR_HANDLING
+	}
+#endif /* #ifndef INTERNAL_ERROR_HANDLING */
+	return tl;
+}
+
+DLinkedList dll_copy_interator(DLinkedList dl)
+{
+#ifdef INTERNAL_ERROR_HANDLING
+	DLinkedList new_dl = (DLinkedList) xmalloc(sizeof(__datastruct__));
+#else
+	DLinkedList new_dl = (DLinkedList) malloc(sizeof(__datastruct__));
+	if(likely(new_dl != (DLinkedList) NULL)) {
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
+		new_dl->in = dl->in;
+		new_dl->out = dl->out;
+#ifndef INTERNAL_ERROR_HANDLING
+	}
+#endif /* #ifndef INTERNAL_ERROR_HANDLING */
+	return new_dl;
+}
+#if 0
+/* TODO: finish implementing */
+DLinkedList dll_clone(DLinkedList dl, void *(*__clonefunc__)(void*))
+{
+	failwith("function not yet implemented");
+	__datastruct_elem__ *e, *e_copy;
+#ifdef INTERNAL_ERROR_HANDLING
+	DLinkedList new_dl = (DLinkedList) xmalloc(sizeof(__datastruct__));
+#else
+	DLinkedList new_dl = (DLinkedList) malloc(sizeof(__datastruct__));
+	if(likely(new_dl != (DLinkedList) NULL)) {
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
+		e = dl->in;
+		while(e != (__datastruct_elem__*) NULL) {
+#ifdef INTERNAL_ERROR_HANDLING
+			e_copy = (__datastruct_elem__*) xmalloc(sizeof(__datastruct_elem__));
+#else
+			e_copy = (__datastruct_elem__*) malloc(sizeof(__datastruct_elem__));
+			if(likely(e_copy != (__datastruct_elem__*) NULL)) {
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
+				e_copy->data = __clonefunc__(e->data);
+				e->next = dl->out;
+				dl->out = e;
+				return data;
+#ifndef INTERNAL_ERROR_HANDLING
+			} else
+				return (void*) NULL;
+#endif /* #ifndef INTERNAL_ERROR_HANDLING */
+		}
+#ifndef INTERNAL_ERROR_HANDLING
+	}
+	return new_dl;
+#endif /* #ifndef INTERNAL_ERROR_HANDLING */
+}
+
+/* TODO: implement*/
+DLinkedList dll_join(DLinkedList dl1, DLinkedList dl2)
+{
+	__datastruct_elem__ *e1, *e2;
+	failwith("function not yet implemented");
+}
+
+/* TODO: implement*/
+DLinkedList dll_filter(DLinkedList dl, BOOL_TYPE (*__filterfunc__)(void*))
+{
+	failwith("function not yet implemented");
+
+}
+#endif /* #if 0 */
+
+void *dll_map(DLinkedList dl, void *(*__mapfunc__)(void *data, void *arg), void *arg)
+{
+	__datastruct_elem__ *e = dl->out;
+
+	while(e != (__datastruct_elem__*) NULL) {
+		arg = __mapfunc__(e->data, arg);
+		e = e->next;
+	}
+	return arg;
+}
+
+#if 0
+/* TODO: implement*/
+void dll_sort(DLinkedList dl, int (*__cmp__)(void *d1, void *d2))
+{
+	failwith("function not yet implemented");
+}
+#endif /* #if 0 */
+
+/* ----- Stack ----- */
+void delete_stack(Stack s, void (*__del__)(void*))
+{
+	Stack temp;
+
+	if(__del__ != (void(*)(void*)) NULL)
+		while(s != (Stack) NULL) {
+			__del__(s->data);
+			temp = s;
+			s = s->next;
+			free(temp);
+		}
+	else
+		while(s != (Stack) NULL) {
+			temp = s;
+			s = s->next;
+			free(temp);
+		}
+
+}
+
+#undef stack_push
+void *stack_push(Stack *s, void *data)
+{
+#ifdef INTERNAL_ERROR_HANDLING
+	__datastruct_elem__ *new = (__datastruct_elem__*) xmalloc(sizeof(__datastruct_elem__));
+#else
+	__datastruct_elem__ *new = (__datastruct_elem__*) malloc(sizeof(__datastruct_elem__));
+	if(new != NULL) {
+#endif	/* #ifdef INTERNAL_ERROR_HANDLING */
+		new->data = data;
+		new->next = *s;
+		*s = new;
+#ifndef INTERNAL_ERROR_HANDLING
+	}
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
+	return data;
+}
+
+#undef stack_pop
+void *stack_pop(Stack *s)
+{
+	void *ret = (void*) NULL;
+	Stack new;
+
+	if(*s != (Stack) NULL) {
+		ret = (*s)->data;
+		new = (*s)->next;
+		free(*s);
+		*s = new;
+	}
+	return ret;
+}
+
+void *stack_peek(Stack s)
+{
+	return unlikely(s == (Stack) NULL) ? (void*) NULL : s->data;
+}
+
+/* ----- Queue ----- */
+Queue new_queue(void)
+{
+#ifdef INTERNAL_ERROR_HANDLING
+	Queue q = (Queue) xmalloc(sizeof(__datastruct__));
+#else
+	Queue q = (Queue) malloc(sizeof(__datastruct__));
+	if(q != (Queue) NULL) {
+#endif	/* #ifdef INTERNAL_ERROR_HANDLING */
+		q->in = (__datastruct_elem__*) NULL;
+		q->out = (__datastruct_elem__*) NULL;
+#ifndef INTERNAL_ERROR_HANDLING
+	}
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
+	return q;
+}
+
+void delete_queue(Queue q, void (*__del__)(void*))
+{
+	__datastruct_elem__ *temp, *iterator;
+
+	if(q != (Queue) NULL) {
+		iterator = q->in;
+		if(__del__ != (void(*)(void*)) NULL)
+			while(iterator != (__datastruct_elem__*) NULL) {
+				__del__(iterator->data);
+				temp = iterator;
+				iterator = iterator->next;
+				free(temp);
+			}
+		else
+			while(iterator != (__datastruct_elem__*) NULL) {
+				temp = iterator;
+				iterator = iterator->next;
+				free(temp);
+			}
+		free(q);
+	}
+}
+
+void queue_push(Queue q, void *data)
+{
+#ifdef INTERNAL_ERROR_HANDLING
+	__datastruct_elem__ *new = (__datastruct_elem__*) xmalloc(sizeof(__datastruct_elem__));
+#else
+	__datastruct_elem__ *new = (__datastruct_elem__*) malloc(sizeof(__datastruct_elem__));
+
+	if(new != (__datastruct_elem__*) NULL) {
+#endif	/* #ifdef INTERNAL_ERROR_HANDLING */
+		new->data = data;
+		new->next = (__datastruct_elem__*) NULL;
+		if(q->in != (__datastruct_elem__*) NULL)
+			q->in->next = new;
+		q->in = new;
+		if(q->out == (__datastruct_elem__*) NULL)
+			q->out = q->in;
+#ifndef INTERNAL_ERROR_HANDLING
+	}
+#endif /* #ifndef INTERNAL_ERROR_HANDLING */
+}
+
+void *queue_pop(Queue q)
+{
+	void *ret = (void*) NULL;
+	__datastruct_elem__ *temp;
+
+	if(q->out != (__datastruct_elem__*) NULL) {
+		ret = q->out->data;
+		temp = q->out;
+		q->out = temp->next;
+		if(q->out == (__datastruct_elem__*) NULL)
+			q->in = (__datastruct_elem__*) NULL;
+		free(temp);
+	}
+	return ret;
+}
+
+void *queue_peek(Queue q)
+{
+	return likely(q->out != (__datastruct_elem__*) NULL) ? q->out->data : (void*) NULL;
+}
+
+/* ----- Bitset ----- */
 bitset new_bitset(size_t size)
 {
 	size_t mem = (size >> 3) + (size % 8 != 0);
@@ -1005,7 +1369,7 @@ bitset new_bitset(size_t size)
 	bitset b = (bitset) xmalloc(mem);
 #else
 	bitset b = (bitset) malloc(mem);
-	if(likely(b != NULL))
+	if(likely(b != (bitset) NULL))
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
 		memset(b, 0, mem);
 	return b;
@@ -1060,7 +1424,7 @@ char *make_path(const char *path, ...)
 	size_t len = strlen(path) + 1;
 
 	va_start(ap, path);
-	while((ptr = va_arg(ap, char*)) != NULL)
+	while((ptr = va_arg(ap, char*)) != (char*) NULL)
 		len += strlen(ptr) + 1;
 	va_end(ap);
 #ifdef INTERNAL_ERROR_HANDLING
@@ -1071,7 +1435,7 @@ char *make_path(const char *path, ...)
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
 		va_start(ap, path);
 		ptr = stpcpy(new_path, path);
-		while((path = va_arg(ap, char*)) != NULL) {
+		while((path = va_arg(ap, char*)) != (char*) NULL) {
 			*ptr++ = FILE_SEPARATOR;
 			ptr = stpcpy(ptr, path);
 		}
@@ -1129,7 +1493,7 @@ void *dirwalk(const char *path, void *(*func)(void*, char*), void *arg)
 		free(entry);
 		closedir(dir);
 	} else
-		arg = NULL;
+		arg = (void*) NULL;
 	return arg;
 }
 #endif /* #ifdef ENABLE_FILESYSTEM */
@@ -1140,7 +1504,7 @@ void *dirwalk(const char *path, void *(*func)(void*, char*), void *arg)
 
 int connect_to(const char *server_name, unsigned port)
 {
-	struct addrinfo *adresses = NULL, *iterator = NULL;
+	struct addrinfo *adresses = (struct addrinfo*) NULL, *iterator = (struct addrinfo*) NULL;
 	char ip_addr[INET6_ADDRSTRLEN] = { 0 }, port_buff[11] = { 0 };
 	int sockfd;
 
@@ -1149,7 +1513,7 @@ int connect_to(const char *server_name, unsigned port)
 	if(sockfd == -1) {
 		log_message(LOG_ERROR, "Error creating socket: %s", strerror(errno));
 		sockfd = CONNECT_ERROR;
-	} else if(getaddrinfo(server_name, port_buff, NULL, &adresses) != 0) {
+	} else if(getaddrinfo(server_name, port_buff, (const struct addrinfo*) NULL, &adresses) != 0) {
 		/* DNS resolution. getaddrinfo creates a linked list (pointed to by adresses),
 		 * 1 element == 1 IP Address. Function IPv6 compatible. */
 		log_message(LOG_ERROR, "Unable to resolve '%s' to a valid IP address", server_name);
@@ -1160,12 +1524,12 @@ int connect_to(const char *server_name, unsigned port)
 		/* Iterate over linked list until we connect successfully or we run out of addresses. */
 		while(connect(sockfd, iterator->ai_addr, (socklen_t) sizeof *iterator->ai_addr) != 0) {
 			iterator = iterator->ai_next;
-			if(unlikely(iterator == NULL)) {
+			if(unlikely(iterator == (struct addrinfo*) NULL)) {
 				sockfd = CONNECT_ERROR;
 				break;
 			}
 		}
-		if(likely(iterator != NULL))
+		if(likely(iterator != (struct addrinfo*) NULL))
 			log_message(LOG_INFO, "Connection established with %s (%s:%d)", server_name,
 					inet_ntop(iterator->ai_family,
 						&((struct sockaddr_in*) iterator->ai_addr)->sin_addr,
@@ -1372,7 +1736,7 @@ int normal_getchar(void)
 pthread_t launch_thread(void *(*start_routine)(void*), void *arg, int detach)
 {
 	pthread_t th;
-	if(pthread_create(&th, NULL, start_routine, arg) != 0) {
+	if(pthread_create(&th, (const pthread_attr_t*) NULL, start_routine, arg) != 0) {
 		log_message(LOG_ERROR, "Error creating thread: %s", strerror(errno));
 		th = 0;
 	} else if(detach && pthread_detach(th) != 0)
@@ -1409,7 +1773,7 @@ void *xpthread_join(pthread_t thread)
 /* -------------------- Memory pool -------------------- */
 #ifdef ENABLE_MEMPOOL
 
-void mempool_create(struct mempool *mp, size_t size, size_t nmemb)
+void new_mempool(struct mempool *mp, size_t size, size_t nmemb)
 {
 	unsigned i;
 	void *val;
@@ -1420,11 +1784,11 @@ void mempool_create(struct mempool *mp, size_t size, size_t nmemb)
 #else
 	mp->mem = malloc((sizeof(unsigned) + size) * nmemb);
 	mp->ptrs = malloc(sizeof(unsigned*) * nmemb);
-	if(unlikely(mp->ptrs == NULL || mp->mem == NULL)) {
+	if(unlikely(mp->mem == (void*) NULL || mp->ptrs == (void**) NULL)) {
 		free(mp->mem);
 		free(mp->ptrs);
-		mp->mem = NULL;
-		mp->ptrs = NULL;
+		mp->mem = (void*) NULL;
+		mp->ptrs = (void**) NULL;
 		mp->size = 0;
 		return;
 	}
@@ -1460,12 +1824,12 @@ void *mempool_alloc(struct mempool *mp)
 	 *	for(i = 0; i < mp->nmemb; i++) {
 	 *		mp->ptrs[i] = val;
 	 *		val += sizeof(unsigned) + mp->size;
- *	}
+ 	 *	}
 	 * }
 	 */
 	if(mp->index < mp->nmemb) {
 		*(unsigned*) mp->ptrs[mp->index] = mp->index;
-		ptr = (void*) mp->ptrs[mp->index++] + sizeof(unsigned);
+		ptr = (void*) ((intptr_t) mp->ptrs[mp->index++] + sizeof(unsigned));
 	}
 	return ptr;
 }
@@ -1473,14 +1837,14 @@ void *mempool_alloc(struct mempool *mp)
 void mempool_free(struct mempool *mp, void *ptr)
 {
 	void *swap;
-	unsigned idx = *(unsigned*) ((void*) ptr - sizeof(unsigned));
+	unsigned idx = *(unsigned*) ((intptr_t) ptr - sizeof(unsigned));
 
 	swap = mp->ptrs[idx];
 	mp->ptrs[idx] = mp->ptrs[--mp->index];
 	mp->ptrs[mp->index] = swap;
 }
 
-void mempool_delete(struct mempool *mp)
+void delete_mempool(struct mempool *mp)
 {
 	free(mp->mem);
 	free(mp->ptrs);
@@ -1503,7 +1867,7 @@ Config_File create_config_file(const char *path)
 	cfg_file. = (Cfg_Var*) xmalloc(CFG_FILE_START_SIZE * sizeof(Cfg_Var));
 #else
 	cfg_file.file = fopen(path, "w");
-	if(cfg_file.file == NULL)
+	if(cfg_file.file == (FILE*) NULL)
 		cfg_file. = (Cfg_Var*) malloc(CFG_FILE_START_SIZE * sizeof(Cfg_Var));
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
 
@@ -1525,8 +1889,8 @@ Mmap *mopen(const char *path, const char *mode)
 	Mmap *f = (Mmap*) xmalloc(sizeof(Mmap));
 #else
 	Mmap *f = (Mmap*) malloc(sizeof(Mmap));
-	if(unlikely(f == NULL))
-		return NULL;
+	if(unlikely(f == (Mmap*) NULL))
+		return (Mmap*) NULL;
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
 
 	for(i = 0; mode[i] != '\0'; i++)
@@ -1576,7 +1940,7 @@ Mmap *mopen(const char *path, const char *mode)
 #else
 				log_message(LOG_ERROR, "Error: invalid mode");
 				free(f);
-				return NULL;
+				return (Mmap*) NULL;
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
 		}
 #ifdef INTERNAL_ERROR_HANDLING
@@ -1595,7 +1959,7 @@ Mmap *mopen(const char *path, const char *mode)
 		perror("Error obtaining file size");
 		exit(EXIT_FAILURE);
 	}
-	if(unlikely((f->ptr = (char*) mmap(NULL, offset,
+	if(unlikely((f->ptr = (byte*) mmap(NULL, offset,
 						prot, flags, i, (off_t) 0)) == MAP_FAILED)) {
 		perror("Error loading file into memory");
 		exit(EXIT_FAILURE);
@@ -1604,23 +1968,23 @@ Mmap *mopen(const char *path, const char *mode)
 	i = open(path, o_flags);
 	if(unlikely(i == -1)) {
 		free(f);
-		return NULL;
+		return (Mmap*) NULL;
 	}
 	if(unlikely((offset = lseek(i, 0, SEEK_END)) == -1)) {
 		close(i);
 		free(f);
-		return NULL;
+		return (Mmap*) NULL;
 	}
 	if(unlikely(lseek(i, 0, SEEK_SET) == -1)) {
 		close(i);
 		free(f);
-		return NULL;
+		return (Mmap*) NULL;
 	}
-	if(unlikely((f->ptr = (char*) mmap(NULL, offset,
+	if(unlikely((f->ptr = (byte*) mmap(NULL, offset,
 						prot | exec_flag, flags, i, (off_t) 0)) == MAP_FAILED)) {
 		close(i);
 		free(f);
-		return NULL;
+		return (Mmap*) NULL;
 	}
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
 	f->endptr = f->offset = f->ptr;
@@ -1634,8 +1998,8 @@ size_t mread(void *ptr, size_t size, size_t nmemb, Mmap *f)
 {
 	size_t rsize = size * nmemb;
 
-	if(unlikely(f == NULL || f->ptr == NULL ||
-				f->offset == NULL || f->endptr == NULL))
+	if(unlikely(f == (Mmap*) NULL || f->ptr == (byte*) NULL ||
+				f->offset == (byte*) NULL || f->endptr == (byte*) NULL))
 		errno = EBADF;
 	else {
 		if(f->offset + size * nmemb >= f->endptr)
@@ -1654,8 +2018,8 @@ size_t mwrite(void *ptr, size_t size, size_t nmemb, Mmap *f)
 {
 	size_t wsize = size * nmemb;
 
-	if(unlikely(f == NULL || f->ptr == NULL ||
-				f->offset == NULL || f->endptr == NULL))
+	if(unlikely(f == (Mmap*) NULL || f->ptr == (byte*) NULL ||
+				f->offset == (byte*) NULL || f->endptr == (byte*) NULL))
 		errno = EBADF;
 	else {
 		if(f->offset + size * nmemb >= f->endptr)
@@ -1671,8 +2035,8 @@ int mgetc(Mmap *f)
 {
 	int ret = EOF;
 
-	if(unlikely(f == NULL || f->ptr == NULL ||
-				f->offset == NULL || f->endptr == NULL))
+	if(unlikely(f == (Mmap*) NULL || f->ptr == (byte*) NULL ||
+				f->offset == (byte*) NULL || f->endptr == (byte*) NULL))
 		errno = EBADF;
 	else
 		ret = f->offset < f->endptr ? (int) *f->offset++ :  EOF;
@@ -1693,8 +2057,8 @@ char *mgets(char *s, int size, Mmap *f)
 	int i = 0;
 	char *ret = (char*) NULL;
 
-	if(unlikely(f == NULL || f->ptr == NULL ||
-				f->offset == NULL || f->endptr == NULL))
+	if(unlikely(f == (Mmap*) NULL || f->ptr == (byte*) NULL ||
+				f->offset == (byte*) NULL || f->endptr == (byte*) NULL))
 		errno = EBADF;
 	else if(f->offset < f->endptr) {
 		while(i < size && f->offset < f->endptr) {
@@ -1712,8 +2076,8 @@ int mungetc(int c, Mmap *f)
 {
 	int ret = EOF;
 
-	if(unlikely(f == NULL || f->ptr == NULL ||
-				f->offset == NULL || f->endptr == NULL))
+	if(unlikely(f == (Mmap*) NULL || f->ptr == (byte*) NULL ||
+				f->offset == (byte*) NULL || f->endptr == (byte*) NULL))
 		errno = EBADF;
 	else if(f->offset >= f->ptr) {
 		*f->offset = c;
@@ -1763,12 +2127,12 @@ int mprintf(Mmap *f, const char *fmt, ...)
 	int ret = -1;
 
 	failwith("this function can cause buffer overflows in its current implementation");
-	if(unlikely(f == NULL || f->ptr == NULL ||
-				f->offset == NULL || f->endptr == NULL))
+	if(unlikely(f == (Mmap*) NULL || f->ptr == (byte*) NULL ||
+				f->offset == (byte*) NULL || f->endptr == (byte*) NULL))
 		errno = EBADF;
 	else {
 		va_start(ap, fmt);
-		ret = vsprintf(f->offset, fmt, ap);
+		ret = vsprintf((char*) f->offset, fmt, ap);
 		f->offset += ret;
 		va_end(ap);
 	}
@@ -1782,13 +2146,13 @@ int mnprintf(Mmap *f, size_t size, const char *fmt, ...)
 	va_list ap;
 	int ret = -1;
 
-	if(unlikely(f == NULL || f->ptr == NULL ||
-				f->offset == NULL || f->endptr == NULL))
+	if(unlikely(f == (Mmap*) NULL || f->ptr == (byte*) NULL ||
+				f->offset == (byte*) NULL || f->endptr == (byte*) NULL))
 		errno = EBADF;
 	else {
 		size = int_max(size, f->ptr - f->offset);
 		va_start(ap, fmt);
-		ret = vsnprintf(f->offset, size, fmt, ap);
+		ret = vsnprintf((char*) f->offset, size, fmt, ap);
 		f->offset += ret;
 		va_end(ap);
 	}
@@ -1800,8 +2164,8 @@ off_t mseek(Mmap *f, off_t offset, int whence)
 {
 	off_t ret = (off_t) -1;
 
-	if(unlikely(f == NULL || f->ptr == NULL ||
-				f->offset == NULL || f->endptr == NULL))
+	if(unlikely(f == (Mmap*) NULL || f->ptr == (byte*) NULL ||
+				f->offset == (byte*) NULL || f->endptr == (byte*) NULL))
 		errno = EBADF;
 	else
 		switch(whence) {
@@ -1990,7 +2354,7 @@ void register_signal_handler(int signum, void (*sighandler)(int))
 http://www.emoticode.net/c/an-example-log-function-using-different-log-levels-and-variadic-macros.html
 */
 static log_level_t __g_loglevel = LOG_DEBUG;
-static FILE *__g_loghandle = NULL;
+static FILE *__g_loghandle = (FILE*) NULL;
 
 void init_log(FILE *stream, log_level_t loglevel)
 {
@@ -2006,7 +2370,7 @@ void va_log_message(log_level_t level, const char *fmt, va_list ap)
 #if defined(ENABLE_TERMIOS_MANIPULATION) && defined(__unix__)
 	Color color = WHITE, bgcolor = BLACK;
 #endif	/* #if defined(ENABLE_TERMIOS_MANIPULATION) && defined(__unix__) */
-	if(unlikely(__g_loghandle == NULL)) {
+	if(unlikely(__g_loghandle == (FILE*) NULL)) {
 		__g_loghandle = stderr;
 		fprintf(stderr, "\x1B[%d;0mWARNING: init_log() was not called\n", YELLOW + 30);
 		reset_style(stderr);
