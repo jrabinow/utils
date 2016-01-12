@@ -366,6 +366,16 @@ char *str_join(int str_array_size, char **str_array, char *separator);
  * free() buffer when done. As an alternative, look up getline(3) */
 char *read_line(FILE *stream);
 
+/* for some reason, the solaris version I tested on didn't declare
+ * flockfile(3), funlockfile(3) or getc_unlocked(3) function prototypes
+ * even when #including <stdio.h>
+ */
+#if defined(__sun) && defined(__SVR4)
+void flockfile(FILE *filehandle);
+void funlockfile(FILE *filehandle);
+int getc_unlocked(FILE *stream);
+#endif /* #if defined(__sun) && defined(__SVR4) */
+
 /* for compatibility with old code. Deprecated */
 /* #define readLine	read_line */
 
