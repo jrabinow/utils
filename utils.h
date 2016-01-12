@@ -94,7 +94,7 @@
 # define unlikely(x)	(x)
 #endif
 
-#ifdef __unix
+#ifdef __unix__
 # define _GNU_SOURCE
 #endif
 
@@ -159,11 +159,11 @@ void xfree(void *ptr);
 /* -------------------- ERROR HANDLING -------------------- */
 #ifdef ENABLE_ERROR_HANDLING
 
-#ifdef __unix
+#ifdef __unix__
 # include <unistd.h>
 # include <signal.h>
 # include <fcntl.h>
-#endif /* #ifdef __unix */
+#endif /* #ifdef __unix__ */
 
 /* exit program with failed status if malloc and consorts fail
  * -> no more error checking necessary
@@ -180,7 +180,7 @@ FILE *xfopen(const char *file, const char *mode);
  * Calls exit() at failure */
 FILE *xfdopen(int fd, const char *mode);
 
-#ifdef __unix
+#ifdef __unix__
 int xopen(const char *path, int flags, ...);
 /* attempts to create a pipe. Calls exit() at failure */
 #define xpipe(pipefd)\
@@ -195,7 +195,7 @@ int xopen(const char *path, int flags, ...);
 		perror("Error redirecting output ");\
 		exit(EXIT_FAILURE);\
 	}
-#endif /* #ifdef __unix */
+#endif /* #ifdef __unix__ */
 
 #endif /* #ifdef ENABLE_ERROR_HANDLING */
 
@@ -340,13 +340,13 @@ char *read_line(FILE *stream);
 /* Use fgets without a preallocated buffer. free() when done */
 #define afgets(stream) getline(NULL, 0, (stream))
 
-#ifdef __unix
+#ifdef __unix__
 /* read as much as possible from file descriptor.
  * free() buffer when done */
 #include <ctype.h>
 #include <unistd.h>
 char *read_file_descriptor(int fd);
-#endif /* #ifdef __unix */
+#endif /* #ifdef __unix__ */
 
 /* Empties buffer till nothing left to read or hits end of line. Useful with scanf/fscanf */
 #define empty_buffer(stream)	{\
@@ -387,9 +387,9 @@ int togglebit(bitset set, int pos);
 /* -------------------- Filesystem functions -------------------- */
 #ifdef ENABLE_FILESYSTEM
 
-#ifdef __unix
+#ifdef __unix__
 #include <sys/stat.h>
-#endif /* #ifdef __unix */
+#endif /* #ifdef __unix__ */
 
 #include <dirent.h>
 #include <stdarg.h>
@@ -452,7 +452,7 @@ int get_single_client(int server_socket);
 
 
 /* -------------------- Terminal manipulation functions and color printing -------------------- */
-#if defined(ENABLE_TERMIOS_MANIPULATION) && defined(__unix)
+#if defined(ENABLE_TERMIOS_MANIPULATION) && defined(__unix__)
 
 #include <unistd.h>
 #include <termios.h>
@@ -496,7 +496,7 @@ int instant_getchar(void);
  * error and sets errno to appropriate value */
 int normal_getchar(void);
 
-#endif	/* #if defined(ENABLE_TERMIOS_MANIPULATION) && defined(__unix) */
+#endif	/* #if defined(ENABLE_TERMIOS_MANIPULATION) && defined(__unix__) */
 
 /* -------------------- Threading -------------------- */
 #ifdef ENABLE_THREADING
@@ -549,7 +549,7 @@ void mempool_delete(struct mempool *mp);
 
 
 /* -------------------- High-level mmap() -------------------- */
-#if defined(ENABLE_MMAP) && defined(__unix)
+#if defined(ENABLE_MMAP) && defined(__unix__)
 
 #include <unistd.h>
 #include <sys/mman.h>
@@ -578,7 +578,7 @@ int mnprintf(Mmap *f, size_t size, const char *fmt, ...);
 /* Unmap and close resources */
 int mclose(Mmap *f);
 
-#endif /* #if defined(ENABLE_MMAP) && defined(__unix) */
+#endif /* #if defined(ENABLE_MMAP) && defined(__unix__) */
 
 
 
@@ -628,12 +628,12 @@ int32_t int_min(int32_t a, int32_t b);
  * value 42 */
 void *initialize_vector(void *dest, const void *src, size_t size, size_t nmemb);
 
-#ifdef __unix
+#ifdef __unix__
 #include <signal.h>
 /* register sighandler as the signal handler function to be called when program receives
  * signal signum. As usual, signals SIGKILL and SIGSTOP cannot be ignored or intercepted */
 void register_signal_handler(int signum, void (*sighandler)(int));
-#endif /* #ifdef __unix */
+#endif /* #ifdef __unix__ */
 
 typedef enum {
 	LOG_DEBUG,

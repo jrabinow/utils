@@ -83,7 +83,7 @@ void *xmalloc(size_t size)
 		ptr = malloc(size);
 		if(likely(ptr != NULL))
 			break;
-#ifdef __unix
+#ifdef __unix__
 		switch(errno) {
 			case ENOMEM:
 				log_message(LOG_ERROR, "Error allocating memory: %s", strerror(errno));
@@ -96,12 +96,12 @@ void *xmalloc(size_t size)
 				}
 				break;
 			default:
-#endif /* #ifdef __unix */
+#endif /* #ifdef __unix__ */
 				log_message(LOG_FATAL, "Error allocating memory: %s", strerror(errno));
 				exit(EXIT_FAILURE);
-#ifdef __unix
+#ifdef __unix__
 		}
-#endif /* #ifdef __unix */
+#endif /* #ifdef __unix__ */
 	} while(BOOL_TRUE);
 
 #ifdef MANAGE_MEM
@@ -122,7 +122,7 @@ void *xcalloc(size_t nmemb, size_t size)
 		ptr = calloc(nmemb, size);
 		if(likely(ptr != NULL))
 			break;
-#ifdef __unix
+#ifdef __unix__
 		switch(errno) {
 			case ENOMEM:
 				log_message(LOG_ERROR, "Error allocating memory: %s", strerror(errno));
@@ -135,12 +135,12 @@ void *xcalloc(size_t nmemb, size_t size)
 				}
 				break;
 			default:
-#endif /* #ifdef __unix */
+#endif /* #ifdef __unix__ */
 				log_message(LOG_FATAL, "Error allocating memory: %s", strerror(errno));
 				exit(EXIT_FAILURE);
-#ifdef __unix
+#ifdef __unix__
 		}
-#endif /* #ifdef __unix */
+#endif /* #ifdef __unix__ */
 	} while(BOOL_TRUE);
 
 #ifdef MANAGE_MEM
@@ -161,7 +161,7 @@ char *xstrdup(const char *str)
 		ptr = strdup(str);
 		if(ptr != (char*) NULL)
 			break;
-#ifdef __unix
+#ifdef __unix__
 		switch(errno) {
 			case ENOMEM:
 				log_message(LOG_ERROR, "Error allocating memory: %s", strerror(errno));
@@ -174,12 +174,12 @@ char *xstrdup(const char *str)
 				}
 				break;
 			default:
-#endif /* #ifdef __unix */
+#endif /* #ifdef __unix__ */
 				log_message(LOG_FATAL, "Error allocating memory: %s", strerror(errno));
 				exit(EXIT_FAILURE);
-#ifdef __unix
+#ifdef __unix__
 		}
-#endif /* #ifdef __unix */
+#endif /* #ifdef __unix__ */
 	} while(BOOL_TRUE);
 
 #ifdef MANAGE_MEM
@@ -199,7 +199,7 @@ void *xrealloc(void *ptr, size_t size)
 		ptr = realloc(ptr, size);
 		if(likely(ptr != NULL))
 			break;
-#ifdef __unix
+#ifdef __unix__
 		switch(errno) {
 			case ENOMEM:
 				log_message(LOG_ERROR, "Error allocating memory: %s", strerror(errno));
@@ -212,12 +212,12 @@ void *xrealloc(void *ptr, size_t size)
 				}
 				break;
 			default:
-#endif /* #ifdef __unix */
+#endif /* #ifdef __unix__ */
 				log_message(LOG_FATAL, "Error allocating memory: %s", strerror(errno));
 				exit(EXIT_FAILURE);
-#ifdef __unix
+#ifdef __unix__
 		}
-#endif /* #ifdef __unix */
+#endif /* #ifdef __unix__ */
 	} while(BOOL_TRUE);
 
 #ifdef MANAGE_MEM
@@ -238,7 +238,7 @@ FILE *xfopen(const char *path, const char *mode)
 		f = fopen(path, mode);
 		if(f != (FILE*) NULL)
 			break;
-#ifdef __unix
+#ifdef __unix__
 		switch(errno) {
 			case ENOMEM:
 				log_message(LOG_ERROR, "Error opening file: %s", strerror(errno));
@@ -252,15 +252,18 @@ FILE *xfopen(const char *path, const char *mode)
 				break;
 			case EINTR:
 				log_message(LOG_ERROR, "Error opening file: %s\nRetrying", strerror(errno));
-				count++;
+				if(count++ >= MAX_RETRIES_OPEN) {
+					log_message(LOG_FATAL, "Giving up after %d tries", MAX_RETRIES_OPEN);
+					exit(EXIT_FAILURE);
+				}
 				break;
 			default:
-#endif /* #ifdef __unix */
+#endif /* #ifdef __unix__ */
 				log_message(LOG_FATAL, "Error opening file: %s", strerror(errno));
 				exit(EXIT_FAILURE);
-#ifdef __unix
+#ifdef __unix__
 		}
-#endif /* #ifdef __unix */
+#endif /* #ifdef __unix__ */
 	} while(BOOL_TRUE);
 
 	return f;
@@ -275,7 +278,7 @@ FILE *xfdopen(int fd, const char *mode)
 		f = fdopen(fd, mode);
 		if(f != (FILE*) NULL)
 			break;
-#ifdef __unix
+#ifdef __unix__
 		switch(errno) {
 			case ENOMEM:
 				log_message(LOG_ERROR, "Error opening file: %s", strerror(errno));
@@ -289,21 +292,24 @@ FILE *xfdopen(int fd, const char *mode)
 				break;
 			case EINTR:
 				log_message(LOG_ERROR, "Error opening file: %s\nRetrying", strerror(errno));
-				count++;
+				if(count++ >= MAX_RETRIES_OPEN) {
+					log_message(LOG_FATAL, "Giving up after %d tries", MAX_RETRIES_OPEN);
+					exit(EXIT_FAILURE);
+				}
 				break;
 			default:
-#endif /* #ifdef __unix */
+#endif /* #ifdef __unix__ */
 				log_message(LOG_FATAL, "Error opening file: %s", strerror(errno));
 				exit(EXIT_FAILURE);
-#ifdef __unix
+#ifdef __unix__
 		}
-#endif /* #ifdef __unix */
+#endif /* #ifdef __unix__ */
 	} while(BOOL_TRUE);
 
 	return f;
 }
 
-#ifdef __unix
+#ifdef __unix__
 int xopen(const char *path, int flags, ...)
 {
 	int fd, count = 0, mode = 0;
@@ -329,23 +335,26 @@ int xopen(const char *path, int flags, ...)
 					exit(EXIT_FAILURE);
 				}
 				break;
-#ifdef _GNU_SOURCE
+#if defined(_GNU_SOURCE) && defined(__linux__)
 			case EINVAL:
 				flags &= ~O_DIRECT;
-#endif /* #ifdef _GNU_SOURCE */
+#endif /* #if defined(_GNU_SOURCE) && defined(__linux__) */
 			case EINTR:
 				log_message(LOG_ERROR, "Error opening file: %s\nRetrying", strerror(errno));
-				count++;
+				if(count++ >= MAX_RETRIES_OPEN) {
+					log_message(LOG_FATAL, "Giving up after %d tries", MAX_RETRIES_OPEN);
+					exit(EXIT_FAILURE);
+				}
 				break;
 			default:
 				log_message(LOG_FATAL, "Error opening file: %s", strerror(errno));
 				exit(EXIT_FAILURE);
 		}
-	} while(1);
+	} while(BOOL_TRUE);
 
 	return fd;
 }
-#endif /* ifdef __unix */
+#endif /* ifdef __unix__ */
 
 #endif /* #if defined(ENABLE_ERROR_HANDLING) || defined(INTERNAL_ERROR_HANDLING) */
 
@@ -1052,32 +1061,47 @@ char *make_path(const char *path, ...)
 void *dirwalk(const char *path, void *(*func)(void*, char*), void *arg)
 {
 	DIR *dir;
-	struct dirent *entry;
+	struct dirent *entry, *result;
 	char *new_path;
-
+	long namelen;
+#ifdef _WIN32
+	namelen = MAX_PATH;
+#else
+	namelen = PATH_MAX;
+#endif /* #ifdef _WIN32 */
 	dir = opendir(path);
 	if(dir != (DIR*) NULL) {
-		/* iterate over linked list. When we have examined all files in directory, readdir() returns NULL */
-		while((entry = readdir(dir)) != (struct dirent*) NULL) {
-			if(strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) {
-				new_path = make_path(path, entry->d_name);
-#ifndef INTERNAL_ERROR_HANDLING
-				if(new_path == (char*) NULL) {
-					closedir(dir);
-					return NULL;
-				}
-#endif /* #ifndef INTERNAL_ERROR_HANDLING */
-#ifdef _WIN32
-				if(is_dir(new_path))
+#ifdef INTERNAL_ERROR_HANDLING
+		entry = (struct dirent*) xmalloc(sizeof(struct dirent) + namelen);
 #else
-					if(entry->d_type == DT_DIR)	/* windows sucks, this line works on unix-based OSs only */
+		entry = (struct dirent*) malloc(sizeof(struct dirent) + namelen);
+		if(entry != NULL) {
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
+		/* iterate over linked list. When we have examined all files in directory, readdir() returns NULL */
+			while(readdir_r(dir, entry, &result) == 0 && result != NULL) {
+				if(strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) {
+					new_path = make_path(path, entry->d_name);
+#ifndef INTERNAL_ERROR_HANDLING
+					if(unlikely(new_path == (char*) NULL)) {
+						closedir(dir);
+						return (void*) NULL;
+					}
+#endif /* #ifndef INTERNAL_ERROR_HANDLING */
+#ifdef _DIRENT_HAVE_D_TYPE
+					if(entry->d_type == DT_DIR)
+#else
+						if(is_dir(new_path))
 #endif /* #ifdef _WIN32 */
-						dirwalk(new_path, func, arg);
-					else
-						arg = func(arg, new_path);
-				free(new_path);
+							dirwalk(new_path, func, arg);
+						else
+							arg = func(arg, new_path);
+					free(new_path);
+				}
 			}
+#ifndef INTERNAL_ERROR_HANDLING
 		}
+#endif /* #ifndef INTERNAL_ERROR_HANDLING */
+		free(entry);
 		closedir(dir);
 	} else
 		arg = NULL;
@@ -1182,7 +1206,7 @@ int get_single_client(int server_socket)
 
 
 /* -------------------- Terminal manipulation functions and color printing -------------------- */
-#if defined(ENABLE_TERMIOS_MANIPULATION) && defined(__unix)
+#if defined(ENABLE_TERMIOS_MANIPULATION) && defined(__unix__)
 
 typedef struct {
 	Color c;
@@ -1314,7 +1338,7 @@ int normal_getchar(void)
 	return 0;
 }
 
-#endif /* #if defined(ENABLE_TERMIOS_MANIPULATION) && defined(__unix) */
+#endif /* #if defined(ENABLE_TERMIOS_MANIPULATION) && defined(__unix__) */
 
 
 /* -------------------- Threading -------------------- */
@@ -1465,7 +1489,7 @@ Config_File create_config_file(const char *path)
 
 
 /* -------------------- High-level mmap() -------------------- */
-#if defined(ENABLE_MMAP) && defined(__unix)
+#if defined(ENABLE_MMAP) && defined(__unix__)
 
 Mmap *mopen(const char *path, const char *mode)
 {
@@ -1484,6 +1508,7 @@ Mmap *mopen(const char *path, const char *mode)
 		switch(mode[i]) {
 			case 'r':
 				prot |= PROT_READ;
+#if defined(__linux__) && defined(_GNU_SOURCE)
 				if(prot & PROT_WRITE)
 					o_flags = O_RDWR | O_CREAT | O_CLOEXEC;
 				else
@@ -1496,6 +1521,20 @@ Mmap *mopen(const char *path, const char *mode)
 				else
 					o_flags = O_WRONLY | O_CREAT | O_CLOEXEC;
 				break;
+#else
+				if(prot & PROT_WRITE)
+					o_flags = O_RDWR | O_CREAT;
+				else
+					o_flags = O_RDONLY;
+				break;
+			case 'w':
+				prot |= PROT_WRITE;
+				if(prot & PROT_READ)
+					o_flags = O_RDWR | O_CREAT;
+				else
+					o_flags = O_WRONLY | O_CREAT;
+				break;
+#endif /* #if defined(__linux__) && defined(_GNU_SOURCE) */
 			case 'x':
 				exec_flag |= PROT_EXEC;
 				break;
@@ -1517,6 +1556,12 @@ Mmap *mopen(const char *path, const char *mode)
 		}
 #ifdef INTERNAL_ERROR_HANDLING
 	i = xopen(path, o_flags);
+#if ! defined(__linux__) || ! defined(_GNU_SOURCE)
+	if(fcntl(i, F_SETFD, FD_CLOEXEC) != 0) {
+		log_message(LOG_FATAL, "Failed setting FD_CLOEXEC flag on file descriptor: %s", strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+#endif /* #if ! defined(__linux__) || ! defined(_GNU_SOURCE) */
 	if(unlikely((offset = lseek(i, 0, SEEK_END)) == -1)) {
 		perror("Error obtaining file size");
 		exit(EXIT_FAILURE);
@@ -1650,20 +1695,36 @@ int mungetc(int c, Mmap *f)
 	return ret;
 }
 
-/* TODO: determine by how much to increment f->offset */
+/* TODO: determine by how much to increment f->offset
+ * Related TODO: "append" &nchars to end of va_list passed to vsscanf */
 #if 0
 int mscanf(Mmap *f, const char *fmt, ...)
 {
 	va_list ap;
-	int ret;
+	int ret, nchars;
+	char *new_fmt = (char*) NULL;
+	size_t len = strlen(fmt);
 
-	va_start(ap, fmt);
-	ret = vsscanf(f->offset, fmt, ap);
-	va_end(ap);
+#ifdef INTERNAL_ERROR_HANDLING
+	new_fmt = (char*) xmalloc(len + 3);
+#else
+	new_fmt = (char*) malloc(len + 3);
+	if(new_fmt != NULL) {
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
+		memcpy(new_fmt, fmt, len);
+		memcpy(&new_fmt[len], "%n\000", 3);
+		va_start(ap, fmt);
+		ret = vsscanf(f->offset, fmt, ap, &nchars);
+		va_end(ap);
+		free(new_fmt);
+		f->offset += nchars;
+#ifndef INTERNAL_ERROR_HANDLING
+	}
+#endif /* #ifndef INTERNAL_ERROR_HANDLING */
 
 	return ret;
 }
-#endif
+#endif /* #if 0 */
 
 /* TODO: prevent buffer overflow in case of insufficient memory */
 int mprintf(Mmap *f, const char *fmt, ...)
@@ -1720,7 +1781,7 @@ off_t mseek(Mmap *f, off_t offset, int whence)
 			case SEEK_END:
 				ret = (off_t) (f->offset = f->endptr + offset);
 				break;
-#ifdef __unix
+#ifdef __unix__
 			case SEEK_DATA:
 				if(f->offset > f->endptr)
 					errno = ENXIO;
@@ -1731,7 +1792,7 @@ off_t mseek(Mmap *f, off_t offset, int whence)
 					errno = ENXIO;
 				ret = (off_t) (f->offset = f->endptr + offset);
 				break;
-#endif /* #ifdef __unix */
+#endif /* #ifdef __unix__ */
 			default:
 				errno = EINVAL;
 		}
@@ -1752,7 +1813,7 @@ int mclose(Mmap *f)
 	return ret;
 }
 
-#endif /* #if defined(ENABLE_MMAP) && defined(__unix) */
+#endif /* #if defined(ENABLE_MMAP) && defined(__unix__) */
 
 /* -------------------- Misc functions -------------------- */
 #ifdef ENABLE_MISC
@@ -1900,9 +1961,9 @@ void va_log_message(log_level_t level, const char *fmt, va_list ap)
 	char buffer[255] = { 0 }, timestamp[255] = { 0 }, *slevel;
 	time_t rawtime;
 	struct tm *timeinfo;
-#if defined(ENABLE_TERMIOS_MANIPULATION) && defined(__unix)
+#if defined(ENABLE_TERMIOS_MANIPULATION) && defined(__unix__)
 	Color color = WHITE, bgcolor = BLACK;
-#endif	/* #if defined(ENABLE_TERMIOS_MANIPULATION) && defined(__unix) */
+#endif	/* #if defined(ENABLE_TERMIOS_MANIPULATION) && defined(__unix__) */
 	if(unlikely(__g_loghandle == NULL)) {
 		__g_loghandle = stderr;
 		fprintf(stderr, "\x1B[%d;0mWARNING: init_log() was not called\n", YELLOW + 30);
@@ -1937,14 +1998,14 @@ void va_log_message(log_level_t level, const char *fmt, va_list ap)
 				bgcolor = RED;
 				break;
 		}
-#if defined(ENABLE_TERMIOS_MANIPULATION) && defined(__unix)
+#if defined(ENABLE_TERMIOS_MANIPULATION) && defined(__unix__)
 		if(__g_loghandle == stdout || __g_loghandle == stderr) {
 			fprintf(__g_loghandle, "\x1B[%d;0m", color + 30);
 			fprintf(__g_loghandle, "\x1B[%dm[%s] [%s] %s", bgcolor + 40, timestamp, slevel, buffer);
 			reset_style(__g_loghandle);
 			putc('\n', __g_loghandle);
 		} else
-#endif	/* #if defined(ENABLE_TERMIOS_MANIPULATION) && defined(__unix) */
+#endif	/* #if defined(ENABLE_TERMIOS_MANIPULATION) && defined(__unix__) */
 			fprintf(__g_loghandle, "[%s] [%s] %s\n", timestamp, slevel, buffer);
 	}
 }
