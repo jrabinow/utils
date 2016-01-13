@@ -125,7 +125,7 @@
 /* fix KERNEL_VERSION() macro preprocessing errors */
 #ifndef __linux__
 # define KERNEL_VERSION(x, y, z)	0
-#endif /* #if defined(__sun) && defined(__SVR4) */
+#endif /* #ifndef __linux__ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -244,6 +244,7 @@ BOOL_TYPE is_valid_int(const char *str);
 /* Same idea as is_valid_int, except checks for float (allows for a single '.' in str) */
 BOOL_TYPE is_valid_float(const char *str);
 
+/* Same idea as is_valid_int, except checks for hexadecimals [0-9a-fA-F]* */
 BOOL_TYPE is_valid_hex(const char *str);
 
 /* returns true if str starts with prefix */
@@ -376,8 +377,7 @@ char *read_line(FILE *stream);
 
 /* for some reason, the solaris version I tested on didn't declare
  * flockfile(3), funlockfile(3) or getc_unlocked(3) function prototypes
- * even when #including <stdio.h>
- */
+ * even when #including <stdio.h> */
 #if defined(__sun) && defined(__SVR4)
 void flockfile(FILE *filehandle);
 void funlockfile(FILE *filehandle);
@@ -553,12 +553,12 @@ char *make_path(const char *path, ...);
 #endif /* ifdef C99 */
 
 /* iterates over and calls func() on every file in filesystem under path. arg is
- * an argument passed as 1st argument to func.
+ * an argument passed as 2nd argument to func.
  * Returns arg after iterating through every file under path
  * In case of an error, dirwalk will return NULL and errno will be set appropriately.
  * Please note that if func() returns NULL at every call, you will have to check
  * errno to determine if an error occured */
-void *dirwalk(const char *path, void *(*func)(void *arg, char *path), void *arg);
+void *dirwalk(const char *path, BOOL_TYPE recurse, void *(*func)(char *path, void *arg), void *arg);
 
 #endif /* #ifdef ENABLE_FILESYSTEM */
 

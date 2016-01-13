@@ -1,12 +1,12 @@
-/* utilsV5.c
+/* utils.c
  * Copyright (C) Julien Rabinow <jnr305@nyu.edu>
  *
- * utilsV5.c is free software: you can redistribute it and/or modify it
+ * utils.c is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
  * Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  *
- * utilsV5.c is distributed in the hope that it will be useful, but
+ * utils.c is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
  * See the GNU General Public License for more details.
@@ -501,6 +501,7 @@ char *const_append(const char *str, ...)
 
 	return new_str;
 }
+#define const_append(...)		const_append(__VA_ARGS__, (char*) NULL)
 
 #undef append
 char *append(char *str, ...)
@@ -538,6 +539,7 @@ char *append(char *str, ...)
 	return new_str;
 }
 #endif /* #ifdef C99 */
+#define append(...)	append(__VA_ARGS__, (char*) NULL)
 
 char *extract(const char *str, char start, char end)
 {
@@ -1446,13 +1448,15 @@ char *make_path(const char *path, ...)
 	return new_path;
 }
 #undef FILE_SEPARATOR
+#define make_path(...)	make_path(__VA_ARGS__, (char*) NULL)
 
-void *dirwalk(const char *path, void *(*func)(void*, char*), void *arg)
+void *dirwalk(const char *path, BOOL_TYPE recurse, void *(*func)(char*, void*), void *arg)
 {
 	DIR *dir;
 	struct dirent *entry, *result;
 	char *new_path;
 	long namelen;
+	int ret;
 #ifdef _WIN32
 	namelen = MAX_PATH;
 #else
@@ -1466,8 +1470,7 @@ void *dirwalk(const char *path, void *(*func)(void*, char*), void *arg)
 		entry = (struct dirent*) malloc(sizeof(struct dirent) + namelen);
 		if(entry != NULL) {
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
-		/* iterate over linked list. When we have examined all files in directory, readdir() returns NULL */
-			while(readdir_r(dir, entry, &result) == 0 && result != NULL) {
+			while((ret = readdir_r(dir, entry, &result)) == 0 && result != (struct dirent*) NULL)
 				if(strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) {
 					new_path = make_path(path, entry->d_name);
 #ifndef INTERNAL_ERROR_HANDLING
@@ -1481,12 +1484,15 @@ void *dirwalk(const char *path, void *(*func)(void*, char*), void *arg)
 #else
 						if(is_dir(new_path))
 #endif /* #ifdef _WIN32 */
-							dirwalk(new_path, func, arg);
-						else
-							arg = func(arg, new_path);
+						{
+							if(recurse)
+								dirwalk(new_path, recurse, func, arg);
+						} else
+							arg = func(new_path, arg);
 					free(new_path);
 				}
-			}
+			if(ret != 0)
+				arg = (void*) NULL;
 #ifndef INTERNAL_ERROR_HANDLING
 		}
 #endif /* #ifndef INTERNAL_ERROR_HANDLING */
