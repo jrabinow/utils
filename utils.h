@@ -41,7 +41,7 @@
 /* Easily read data from streams/file descriptors */
 #define ENABLE_READ_DATA
 
-/* Data structures: double linked list, stack, queue, bitset */
+/* Data structures: double linked list, stack, queue, Bitset */
 #define ENABLE_DATASTRUCTS
 
 /* Directory navigation functions */
@@ -55,7 +55,7 @@
 #define ENABLE_TERMIOS_MANIPULATION
 
 /* Threading functions. Still very basic */
-/* #define ENABLE_THREADING */
+#define ENABLE_THREADING
 
 /* Memory pool, to cache heap memory and avoid having to call malloc. Idea is that
  * we often ask for same memory sizes (nodes in a linked list or tree, data structures
@@ -439,6 +439,14 @@ void delete_mempool(struct mempool *mp);
 #ifdef ENABLE_DATASTRUCTS
 #include <malloc.h>
 
+/*ISO C forbids zero-size array ‘data’ */
+#define __ARRAY_SIZEOF_DATA__	1
+
+typedef struct {
+	size_t size, nmemb;
+	byte data[__ARRAY_SIZEOF_DATA__];
+} __array_data__;
+
 typedef struct __datastruct_elem__ {
 	void *data;
 	struct __datastruct_elem__ *next;
@@ -447,6 +455,24 @@ typedef struct __datastruct_elem__ {
 typedef struct __datastruct__ {
 	__datastruct_elem__ *in, *out;
 } __datastruct__;
+
+/* ----- Array ----- */
+typedef __array_data__* Array;
+
+/* WARNING: size refers to the size of a single element in the array, NOT to the size
+ * of the array itself */
+Array new_array(size_t size);
+#define delete_array		free
+Array array_clone(Array a, void *(*__clonefunc__)(void*));
+Array c_array_to_array(void *data, size_t size, size_t nmemb);
+
+void *array_append(Array a, void *elem);
+void *array_insert(Array a, void *elem, size_t index);
+Array array_filter(Array a, BOOL_TYPE (*__filterfunc__)(void*));
+void *array_map(Array a, void *(*__mapfunc__)(void *data, void *arg), void *arg);
+void array_sort(Array a, int (*__cmpfunc__)(void *e1, void *e2));
+
+#define array(a, index)	((void*) index < (a)->nmemb ? (a)->data + size * (index) : NULL)
 
 /* ----- Double linked list ----- */
 typedef __datastruct__* DLinkedList;
@@ -497,23 +523,30 @@ void *queue_pop(Queue q);
 void *queue_peek(Queue q);
 
 /* ----- Bitset ----- */
-typedef byte *bitset;
+typedef struct {
+	size_t size;
+	byte data[1];
+} __bitset_struct__;
 
-bitset new_bitset(size_t size);
+typedef __bitset_struct__ *Bitset;
+
+Bitset new_bitset(size_t size);
 
 #define free_bitset	free
 
+Bitset clone_bitset(const Bitset set);
+
 /* obtain bit at position pos from set array */
-int getbit(const bitset set, int pos);
+int getbit(const Bitset set, int pos);
 
 /* set bit at position pos to 1 */
-void setbit(bitset set, int pos);
+void setbit(Bitset set, int pos);
 
 /* set bit at position pos to 0 */
-void unsetbit(bitset set, int pos);
+void unsetbit(Bitset set, int pos);
 
 /* flip bit at position pos */
-int togglebit(bitset set, int pos);
+int togglebit(Bitset set, int pos);
 
 #endif /* #ifdef ENABLE_DATASTRUCTS */
 
@@ -648,12 +681,12 @@ int normal_getchar(void);
 #define NO_DETACH_THREAD	0
 
 /* launches start_routine in a new thread with arg as argument. detach is a flag
- * to tell if we should call pthread_detach on new thread or not.
- * Returns thread id variable */
-pthread_t launch_thread(void *(start_routine)(void*), void *arg, int detach);
+ * to tell if we should call pthread_detach on new thread or not (see
+ * pthread_detach(3) for more details). Returns thread id variable */
+pthread_t launch_thread(void *(*start_routine)(void*), void *arg, const pthread_attr_t *attr);
 
 #ifdef ENABLE_ERROR_HANDLING
-pthread_t xlaunch_thread(void *(*start_routine)(void*), void *arg, int detach);
+pthread_t xlaunch_thread(void *(*start_routine)(void*), void *arg, const pthread_attr_t *attr);
 
 void *xpthread_join(pthread_t thread);
 #endif /* #ifdef ENABLE_ERROR_HANDLING */

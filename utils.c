@@ -538,8 +538,8 @@ char *append(char *str, ...)
 
 	return new_str;
 }
-#endif /* #ifdef C99 */
 #define append(...)	append(__VA_ARGS__, (char*) NULL)
+#endif /* #ifdef C99 */
 
 char *extract(const char *str, char start, char end)
 {
@@ -1001,6 +1001,173 @@ char *read_file_descriptor(int fd)
 /* -------------------- DATA STRUCTURES -------------------- */
 #ifdef ENABLE_DATASTRUCTS
 
+/* ----- Arrays ----- */
+#define __ARRAY_START_NMEMB 32
+Array new_array(size_t size)
+{
+#ifdef INTERNAL_ERROR_HANDLING
+	Array a = (Array) xmalloc(sizeof(__array_data__) - __ARRAY_SIZEOF_DATA__ + __ARRAY_START_NMEMB * size);
+#else
+	Array a = (Array) malloc(sizeof(__array_data__) - __ARRAY_SIZEOF_DATA__ + __ARRAY_START_NMEMB * size);
+	if(likely(a != (Array) NULL)) {
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
+		a->size = size;
+		a->nmemb = 0;
+#ifndef INTERNAL_ERROR_HANDLING
+	}
+#endif /* #ifndef INTERNAL_ERROR_HANDLING */
+	return a;
+}
+
+Array c_array_to_array(void *data, size_t size, size_t nmemb)
+{
+	Array a = (Array) NULL;
+	size_t incr;
+
+	incr = nmemb + (nmemb == 0) - 1;
+	incr |= incr >> 1;
+	incr |= incr >> 2;
+	incr |= incr >> 4;
+	incr |= incr >> 8;
+	incr |= incr >> 16;
+	incr |= incr >> 32;
+	incr++;
+#ifdef INTERNAL_ERROR_HANDLING
+	a = (Array) xmalloc(sizeof(__array_data__) - __ARRAY_SIZEOF_DATA__ + incr * size);
+#else
+	a = (Array) malloc(sizeof(__array_data__) - __ARRAY_SIZEOF_DATA__ + incr * size);
+	if(likely(a != (Array) NULL)) {
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
+		a->size = size;
+		a->nmemb = incr;
+		memcpy(a->data, data, size * nmemb);
+#ifndef INTERNAL_ERROR_HANDLING
+	}
+#endif /* #ifndef INTERNAL_ERROR_HANDLING */
+	return a;
+}
+Array clone_array(Array a, void *(*__clonefunc__)(void*))
+{
+	Array a_copy = (Array) NULL;
+	size_t incr, numbytes = a->size * a->nmemb;
+
+	incr = a->nmemb + (a->nmemb == 0) - 1;
+	incr |= incr >> 1;
+	incr |= incr >> 2;
+	incr |= incr >> 4;
+	incr |= incr >> 8;
+	incr |= incr >> 16;
+	incr |= incr >> 32;
+	incr++;
+#ifdef INTERNAL_ERROR_HANDLING
+	a_copy = (Array) xmalloc(sizeof(__array_data__) - __ARRAY_SIZEOF_DATA__ + incr * a->size);
+#else
+	a_copy = (Array) malloc(sizeof(__array_data__) - __ARRAY_SIZEOF_DATA__ + incr * a->size);
+	if(likely(a_copy != (Array) NULL)) {
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
+		if(__clonefunc__ == (void *(*)(void*)) NULL)
+			for(incr = 0; incr < numbytes; incr += a->size)
+				*(void**) (a_copy->data + incr) = __clonefunc__(a->data + incr);
+		else
+			memcpy(a_copy->data, a->data, numbytes);
+		a_copy->size = a->size;
+		a_copy->nmemb = a->nmemb;
+#ifndef INTERNAL_ERROR_HANDLING
+	}
+#endif /* #ifndef INTERNAL_ERROR_HANDLING */
+
+	return a_copy;
+}
+
+void *array_append(Array a, void *elem)
+{
+	if(a->nmemb >= __ARRAY_START_NMEMB && (a->nmemb & (a->nmemb - 1)) == 0)
+#ifdef INTERNAL_ERROR_HANDLING
+		a = (void*) xrealloc(a, sizeof(__array_data__) + a->size * (a->nmemb << 1));
+#else
+	a = (void*) realloc(a, sizeof(__array_data__) + a->size * (a->nmemb << 1));
+	if(likely(a != (void*) NULL))
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
+		*(void**) (a->data + a->size * a->nmemb++) = elem;
+#ifndef INTERNAL_ERROR_HANDLING
+	else
+		return (void*) NULL;
+#endif /* #ifndef INTERNAL_ERROR_HANDLING */
+	return elem;
+}
+
+void *array_insert(Array a, void *elem, size_t index)
+{
+	size_t incr;
+
+	if(index > a->nmemb) {
+		incr = index + (index == 0) - 1;
+		incr |= incr >> 1;
+		incr |= incr >> 2;
+		incr |= incr >> 4;
+		incr |= incr >> 8;
+		incr |= incr >> 16;
+		incr |= incr >> 32;
+		incr++;
+#ifdef INTERNAL_ERROR_HANDLING
+		a = (void*) xrealloc(a, sizeof(__array_data__) + incr * a->size);
+#else
+		a = (void*) realloc(a, sizeof(__array_data__) + incr * a->size);
+		if(unlikely(a) == (void*) NULL)
+			return (void*) NULL;
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
+	}
+	*(void**) (a->data + a->size * index) = elem;
+
+	return elem;
+}
+
+Array array_filter(Array a, BOOL_TYPE (*__filterfunc__)(void*))
+{
+	size_t incr, j, numbytes = a->size * a->nmemb;
+	Array filtered = (Array) NULL;
+
+	incr = a->nmemb + (a->nmemb == 0) - 1;
+	incr |= incr >> 1;
+	incr |= incr >> 2;
+	incr |= incr >> 4;
+	incr |= incr >> 8;
+	incr |= incr >> 16;
+	incr |= incr >> 32;
+	incr++;
+#ifdef INTERNAL_ERROR_HANDLING
+	filtered = (Array) xmalloc(sizeof(__array_data__) - __ARRAY_SIZEOF_DATA__ + incr * a->size);
+#else
+	filtered = (Array) malloc(sizeof(__array_data__) - __ARRAY_SIZEOF_DATA__ + incr * a->size);
+	if(likely(a_copy != (Array) NULL)) {
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
+		filtered->size = a->size;
+		filtered->nmemb = 0;
+		for(incr = 0, j = 0; incr < numbytes; incr += a->size)
+			if(__filterfunc__(*(void**) (a->data + a->size * j)))
+				*(void**) (filtered->data + filtered->size * incr) = a->data + a->size * j;
+#ifndef INTERNAL_ERROR_HANDLING
+	}
+#endif /* #ifndef INTERNAL_ERROR_HANDLING */
+
+	return filtered;
+}
+
+void *array_map(Array a, void *(*__mapfunc__)(void *data, void *arg), void *arg)
+{
+	size_t i;
+
+	for(i = 0; i < a->size; i++)
+		arg = __mapfunc__(*(void**) (a->data + a->size * i), arg);
+
+	return arg;
+}
+
+void array_sort(Array a, int (*__cmpfunc__)(void *e1, void *e2))
+{
+	qsort(a->data, a->nmemb, a->size, (__compar_fn_t) __cmpfunc__);
+}
+
 /* ----- Double-linked list ----- */
 DLinkedList new_dlinkedlist(void)
 {
@@ -1155,7 +1322,7 @@ DLinkedList dll_copy_interator(DLinkedList dl)
 }
 #if 0
 /* TODO: finish implementing */
-DLinkedList dll_clone(DLinkedList dl, void *(*__clonefunc__)(void*))
+DLinkedList clone_dll(DLinkedList dl, void *(*__clonefunc__)(void*))
 {
 	failwith("function not yet implemented");
 	__datastruct_elem__ *e, *e_copy;
@@ -1364,40 +1531,63 @@ void *queue_peek(Queue q)
 }
 
 /* ----- Bitset ----- */
-bitset new_bitset(size_t size)
+Bitset new_bitset(size_t size)
 {
 	size_t mem = (size >> 3) + (size % 8 != 0);
+	Bitset b;
 #ifdef INTERNAL_ERROR_HANDLING
-	bitset b = (bitset) xmalloc(mem);
+	b = (Bitset) xmalloc(sizeof(__bitset_struct__) + mem);
 #else
-	bitset b = (bitset) malloc(mem);
-	if(likely(b != (bitset) NULL))
+	b = (Bitset) malloc(sizeof(__bitset_struct__) + mem);
+	if(likely(b != (Bitset) NULL))
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
-		memset(b, 0, mem);
+		memset(b->data, 0, mem);
+	b->size = size;
 	return b;
 }
 
-int getbit(const bitset set, int pos)
+Bitset clone_bitset(Bitset set)
 {
-	return (set[pos >> 3] >> (pos % 8)) & 1;
+	Bitset set_clone;
+	size_t mem = (set->size >> 3) + (set->size % 8 != 0);
+
+#ifdef INTERNAL_ERROR_HANDLING
+	set_clone = (Bitset) xmalloc(sizeof(__bitset_struct__) + mem);
+#else
+	set_clone = (Bitset) malloc(sizeof(__bitset_struct__) + mem);
+	if(likely(set_clone != (Bitset) NULL)) {
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
+		memcpy(set_clone->data, set->data, mem);
+		set_clone->size = set->size;
+#ifndef INTERNAL_ERROR_HANDLING
+	}
+#endif /* #ifndef INTERNAL_ERROR_HANDLING */
+
+	return set_clone;
 }
 
-void setbit(bitset set, int pos)
+int getbit(const Bitset set, int pos)
 {
-	set[pos >> 3] |= (1 << (pos % 8));
+	return (set->data[pos >> 3] >> (pos % 8)) & 1;
 }
 
-void unsetbit(bitset set, int pos)
+void setbit(Bitset set, int pos)
 {
-	set[pos >> 3] &= ~(1 << (pos % 8));
+	set->data[pos >> 3] |= (1 << (pos % 8));
 }
 
-int togglebit(bitset set, int pos)
+void unsetbit(Bitset set, int pos)
 {
-	set[pos >> 3] ^= 1 << pos % 8;
-	return (set[pos >> 3] >> (pos % 8)) & 1;
+	set->data[pos >> 3] &= ~(1 << (pos % 8));
 }
-#endif /* #ifdef ENABLE_BITSET */
+
+int togglebit(Bitset set, int pos)
+{
+	set->data[pos >> 3] ^= 1 << pos % 8;
+
+	return (set->data[pos >> 3] >> (pos % 8)) & 1;
+}
+#endif /* #ifdef ENABLE_Bitset */
 
 
 /* -------------------- Filesystem functions -------------------- */
@@ -1448,7 +1638,9 @@ char *make_path(const char *path, ...)
 	return new_path;
 }
 #undef FILE_SEPARATOR
-#define make_path(...)	make_path(__VA_ARGS__, (char*) NULL)
+#ifdef C99
+# define make_path(...)	make_path(__VA_ARGS__, (char*) NULL)
+#endif /* #ifdef C99 */
 
 void *dirwalk(const char *path, BOOL_TYPE recurse, void *(*func)(char*, void*), void *arg)
 {
@@ -1739,22 +1931,21 @@ int normal_getchar(void)
 /* -------------------- Threading -------------------- */
 #ifdef ENABLE_THREADING
 
-pthread_t launch_thread(void *(*start_routine)(void*), void *arg, int detach)
+pthread_t launch_thread(void *(*start_routine)(void*), void *arg, const pthread_attr_t *attr)
 {
 	pthread_t th;
-	if(pthread_create(&th, (const pthread_attr_t*) NULL, start_routine, arg) != 0) {
+	if(pthread_create(&th, attr, start_routine, arg) != 0) {
 		log_message(LOG_ERROR, "Error creating thread: %s", strerror(errno));
 		th = 0;
-	} else if(detach && pthread_detach(th) != 0)
-		log_message(LOG_ERROR, "Error detaching thread: %s", strerror(errno));
+	}
 	return th;
 }
 
 #ifdef ENABLE_ERROR_HANDLING
 
-pthread_t xlaunch_thread(void *(*start_routine)(void*), void *arg, int detach)
+pthread_t xlaunch_thread(void *(*start_routine)(void*), void *arg, const pthread_attr_t *attr)
 {
-	pthread_t th = launch_thread(start_routine, arg, detach);
+	pthread_t th = launch_thread(start_routine, arg, attr);
 	if(th == 0) {
 		log_message(LOG_FATAL, "Thread not created: %s", strerror(errno));
 		exit(EXIT_FAILURE);
@@ -1830,7 +2021,7 @@ void *mempool_alloc(struct mempool *mp)
 	 *	for(i = 0; i < mp->nmemb; i++) {
 	 *		mp->ptrs[i] = val;
 	 *		val += sizeof(unsigned) + mp->size;
- 	 *	}
+	 *	}
 	 * }
 	 */
 	if(mp->index < mp->nmemb) {
@@ -2187,8 +2378,8 @@ off_t mseek(Mmap *f, off_t offset, int whence)
 #if defined(_GNU_SOURCE) && (( defined(__linux__) && LINUX_VERSION_CODE >=\
 			KERNEL_VERSION(3, 1, 0) ) || defined(__DragonFly__) ||\
 		defined(__FreeBSD__) || (defined(__sun) && defined(__SVR4)))
-/* man lseek(3) for compatibility. Current compatibility (2016/01/11) includes
- * GNU-Linux for kernels 3.1.0+, DragonFlyBSD, FreeBSD and Solaris */
+				/* man lseek(3) for compatibility. Current compatibility (2016/01/11) includes
+				 * GNU-Linux for kernels 3.1.0+, DragonFlyBSD, FreeBSD and Solaris */
 			case SEEK_DATA:
 				if(f->offset >= f->endptr || f->offset + offset >= f->endptr)
 					errno = ENXIO;
@@ -2202,8 +2393,8 @@ off_t mseek(Mmap *f, off_t offset, int whence)
 					ret = (off_t) (f->offset = f->endptr + offset);
 				break;
 #endif /* #if defined(_GNU_SOURCE) && ((defined(__linux__) && LINUX_VERSION_CODE >=\
-			KERNEL_VERSION(3, 1, 0)) || defined(__DragonFly__) ||\
-		defined(__FreeBSD__) || (defined(__sun) && defined(__SVR4))) */
+	  KERNEL_VERSION(3, 1, 0)) || defined(__DragonFly__) ||\
+	  defined(__FreeBSD__) || (defined(__sun) && defined(__SVR4))) */
 			default:
 				errno = EINVAL;
 		}
