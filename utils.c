@@ -1086,6 +1086,40 @@ byte *read_file(const char *path, ssize_t *n)
 }
 #endif /* #ifdef ENABLE_READ_DATA */
 
+char *read_file(const char *path)
+{
+	char *ptr;
+	int fd;
+
+#ifdef INTERNAL_ERROR_HANDLING
+#if defined(__linux__) && defined(_GNU_SOURCE)
+	fd = xopen(path, O_RDONLY | O_CLOEXEC);
+#else
+	fd = xopen(path, O_RDONLY);
+	if(fcntl(fd, F_SETFD, FD_CLOEXEC) != 0) {
+		log_message(LOG_FATAL, "Failed setting FD_CLOEXEC flag on file descriptor: %s", strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+#endif /* #if defined(__linux__) && defined(_GNU_SOURCE) */
+#else
+#if defined(__linux__) && defined(_GNU_SOURCE)
+	fd = open(path, O_RDONLY | O_CLOEXEC);
+#else
+	fd = xopen(path, O_RDONLY);
+	if(fcntl(fd, F_SETFD, FD_CLOEXEC) != 0)
+		log_message(LOG_FATAL, "Failed setting FD_CLOEXEC flag on file descriptor: %s", strerror(errno));
+#endif /* #if defined(__linux__) && defined(_GNU_SOURCE) */
+	if(unlikely(fd == -1))
+		return (char*) NULL;
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
+
+	ptr = read_file_descriptor(fd);
+	close(fd);
+
+	return ptr;
+}
+
+
 
 
 /* -------------------- DATA STRUCTURES -------------------- */
@@ -1728,7 +1762,7 @@ char *make_path(const char *path, ...)
 }
 #undef FILE_SEPARATOR
 #ifdef C99
-# define make_path(...)	make_path(__VA_ARGS__, (char*) NULL)
+#define make_path(...)	make_path(__VA_ARGS__, (char*) NULL)
 #endif /* #ifdef C99 */
 
 void *dirwalk(const char *path, BOOL_TYPE recurse, void *(*func)(char*, void*), void *arg)
