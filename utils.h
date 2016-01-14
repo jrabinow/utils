@@ -482,6 +482,14 @@ struct __array_data__ {
 	byte data[__ARRAY_SIZEOF_DATA_ELEM];
 };
 
+/*ISO C forbids zero-size array ‘data’ */
+#define __ARRAY_SIZEOF_DATA__	1
+
+typedef struct {
+	size_t size, nmemb;
+	byte data[__ARRAY_SIZEOF_DATA__];
+} __array_data__;
+
 typedef struct __datastruct_elem__ {
 	void *data;
 	struct __datastruct_elem__ *next;
@@ -490,6 +498,24 @@ typedef struct __datastruct_elem__ {
 typedef struct __datastruct__ {
 	__datastruct_elem__ *in, *out;
 } __datastruct__;
+
+/* ----- Array ----- */
+typedef __array_data__* Array;
+
+/* WARNING: size refers to the size of a single element in the array, NOT to the size
+ * of the array itself */
+Array new_array(size_t size);
+#define delete_array		free
+Array array_clone(Array a, void *(*__clonefunc__)(void*));
+Array c_array_to_array(void *data, size_t size, size_t nmemb);
+
+void *array_append(Array a, void *elem);
+void *array_insert(Array a, void *elem, size_t index);
+Array array_filter(Array a, BOOL_TYPE (*__filterfunc__)(void*));
+void *array_map(Array a, void *(*__mapfunc__)(void *data, void *arg), void *arg);
+void array_sort(Array a, int (*__cmpfunc__)(void *e1, void *e2));
+
+#define array(a, index)	((void*) index < (a)->nmemb ? (a)->data + size * (index) : NULL)
 
 /* ----- Double linked list ----- */
 typedef __datastruct__* DLinkedList;
