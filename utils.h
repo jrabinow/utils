@@ -384,9 +384,6 @@ void funlockfile(FILE *filehandle);
 int getc_unlocked(FILE *stream);
 #endif /* #if defined(__sun) && defined(__SVR4) */
 
-/* for compatibility with old code. Deprecated */
-/* #define readLine	read_line */
-
 /* Use fgets without a preallocated buffer. free() when done */
 #define afgets(stream) getline(NULL, 0, (stream))
 

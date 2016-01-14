@@ -997,6 +997,40 @@ char *read_file_descriptor(int fd)
 }
 #endif /* #ifdef ENABLE_READ_DATA */
 
+char *read_file(const char *path)
+{
+	char *ptr;
+	int fd;
+
+#ifdef INTERNAL_ERROR_HANDLING
+#if defined(__linux__) && defined(_GNU_SOURCE)
+	fd = xopen(path, O_RDONLY | O_CLOEXEC);
+#else
+	fd = xopen(path, O_RDONLY);
+	if(fcntl(fd, F_SETFD, FD_CLOEXEC) != 0) {
+		log_message(LOG_FATAL, "Failed setting FD_CLOEXEC flag on file descriptor: %s", strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+#endif /* #if defined(__linux__) && defined(_GNU_SOURCE) */
+#else
+#if defined(__linux__) && defined(_GNU_SOURCE)
+	fd = open(path, O_RDONLY | O_CLOEXEC);
+#else
+	fd = xopen(path, O_RDONLY);
+	if(fcntl(fd, F_SETFD, FD_CLOEXEC) != 0)
+		log_message(LOG_FATAL, "Failed setting FD_CLOEXEC flag on file descriptor: %s", strerror(errno));
+#endif /* #if defined(__linux__) && defined(_GNU_SOURCE) */
+	if(unlikely(fd == -1))
+		return (char*) NULL;
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
+
+	ptr = read_file_descriptor(fd);
+	close(fd);
+
+	return ptr;
+}
+
+
 
 /* -------------------- DATA STRUCTURES -------------------- */
 #ifdef ENABLE_DATASTRUCTS
@@ -1608,6 +1642,7 @@ int is_dir(const char *path)
 #else
 #define FILE_SEPARATOR	'/'
 #endif /* #ifdef _WIN32 */
+
 #undef make_path
 char *make_path(const char *path, ...)
 {
@@ -1639,7 +1674,7 @@ char *make_path(const char *path, ...)
 }
 #undef FILE_SEPARATOR
 #ifdef C99
-# define make_path(...)	make_path(__VA_ARGS__, (char*) NULL)
+#define make_path(...)	make_path(__VA_ARGS__, (char*) NULL)
 #endif /* #ifdef C99 */
 
 void *dirwalk(const char *path, BOOL_TYPE recurse, void *(*func)(char*, void*), void *arg)
@@ -1664,7 +1699,11 @@ void *dirwalk(const char *path, BOOL_TYPE recurse, void *(*func)(char*, void*), 
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
 			while((ret = readdir_r(dir, entry, &result)) == 0 && result != (struct dirent*) NULL)
 				if(strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) {
+#ifdef C99
 					new_path = make_path(path, entry->d_name);
+#else
+					new_path = make_path(path, entry->d_name, NULL);
+#endif /* #ifdef C99 */
 #ifndef INTERNAL_ERROR_HANDLING
 					if(unlikely(new_path == (char*) NULL)) {
 						closedir(dir);
@@ -2143,7 +2182,7 @@ Mmap *mopen(const char *path, const char *mode)
 #ifdef INTERNAL_ERROR_HANDLING
 	i = xopen(path, o_flags);
 #if (! defined(__linux__)) || (! defined(_GNU_SOURCE))
-	if(fcntl(i, F_SETFD, FD_CLOEXEC) != 0) {
+	if(unlikely(fcntl(i, F_SETFD, FD_CLOEXEC) != 0)) {
 		log_message(LOG_FATAL, "Failed setting FD_CLOEXEC flag on file descriptor: %s", strerror(errno));
 		exit(EXIT_FAILURE);
 	}
@@ -2167,6 +2206,13 @@ Mmap *mopen(const char *path, const char *mode)
 		free(f);
 		return (Mmap*) NULL;
 	}
+#if (! defined(__linux__)) || (! defined(_GNU_SOURCE))
+	if(unlikely(fcntl(i, F_SETFD, FD_CLOEXEC) != 0)) {
+		close(i);
+		free(f);
+		return (Mmap*) NULL;
+	}
+#endif /* #if (! defined(__linux__)) || (! defined(_GNU_SOURCE)) */
 	if(unlikely((offset = lseek(i, 0, SEEK_END)) == -1)) {
 		close(i);
 		free(f);
@@ -2437,6 +2483,7 @@ Weekday get_day_of_week(int day, int month, int year)
 	k = year % 100;
 	j = year / 100;
 	d = (day + 13 * (month + 1) / 5 + k + k / 4 + j / 4 + 5 * j) % 7;
+
 	return d <= 1 ? d + 5 : d - 2;
 }
 
@@ -2533,6 +2580,7 @@ void *initialize_vector(void *dest, const void *src, size_t size, size_t nmemb)
 	return dest;
 }
 
+/* TODO: add possibility to modify sa_flags and sa_mask. See sigaction(2) for more info */
 void register_signal_handler(int signum, void (*sighandler)(int))
 {
 	struct sigaction new_sigaction;
@@ -2548,8 +2596,7 @@ void register_signal_handler(int signum, void (*sighandler)(int))
 }
 
 /* From
-http://www.emoticode.net/c/an-example-log-function-using-different-log-levels-and-variadic-macros.html
-*/
+http://www.emoticode.net/c/an-example-log-function-using-different-log-levels-and-variadic-macros.html */
 static log_level_t __g_loglevel = LOG_DEBUG;
 static FILE *__g_loghandle = (FILE*) NULL;
 
