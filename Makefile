@@ -3,7 +3,7 @@
 
 CC=gcc
 CFLAGS=-Wall -Wextra -march=native
-LDFLAGS=-s
+LDFLAGS=-s -lpthread
 
 ifeq ($(CC), gcc)
 	GCCVERSION := $(shell $(CC) -dumpversion|cut -d. -f1,2)
