@@ -12,7 +12,7 @@
  * See the GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License along
- * with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "utils.h"
@@ -81,7 +81,7 @@ void *xmalloc(size_t size)
 
 	do {
 		ptr = malloc(size);
-		if(likely(ptr != (void*) NULL))
+		if(likely(ptr != (void*) NULL) || size == 0)
 			break;
 #ifdef __unix__
 		switch(errno) {
@@ -120,7 +120,7 @@ void *xcalloc(size_t nmemb, size_t size)
 
 	do {
 		ptr = calloc(nmemb, size);
-		if(likely(ptr != (void*) NULL))
+		if(likely(ptr != (void*) NULL) || size == 0 || nmemb == 0)
 			break;
 #ifdef __unix__
 		switch(errno) {
@@ -159,7 +159,7 @@ char *xstrdup(const char *str)
 
 	do {
 		ptr = strdup(str);
-		if(ptr != (char*) NULL)
+		if(likely(ptr != (char*) NULL))
 			break;
 #ifdef __unix__
 		switch(errno) {
@@ -197,7 +197,7 @@ void *xrealloc(void *ptr, size_t size)
 
 	do {
 		ptr = realloc(ptr, size);
-		if(likely(ptr != (void*) NULL))
+		if(likely(ptr != (void*) NULL) || size == 0)
 			break;
 #ifdef __unix__
 		switch(errno) {
@@ -443,7 +443,7 @@ void str_toupper(char *str)
 			*str = *str - 32;	/* + 'A' - 'a' */
 }
 
-#if (! defined(__linux__)) && (! defined(BSD))
+#if (! defined(__linux__)) && (! defined(BSD)) && (! defined(__MACH__))
 char *stpcpy(char *dest, const char *src)
 {
 	size_t len = strlen(src);
@@ -452,7 +452,7 @@ char *stpcpy(char *dest, const char *src)
 
 	return dest + 1;
 }
-#endif /* #if (! defined(__linux__)) && (! defined(BSD)) */
+#endif /* #if (! defined(__linux__)) && (! defined(BSD)) && (! defined(__MACH__)) */
 
 #ifndef __linux__
 char *strchrnul(const char *s, int c)
@@ -538,8 +538,8 @@ char *append(char *str, ...)
 
 	return new_str;
 }
-#endif /* #ifdef C99 */
 #define append(...)	append(__VA_ARGS__, (char*) NULL)
+#endif /* #ifdef C99 */
 
 char *extract(const char *str, char start, char end)
 {
@@ -689,7 +689,7 @@ char *replace_str(const char *haystack, const char *needle, const char *replacem
 	char *new_str = (char*) NULL;
 	char *ptr = strstr(haystack, needle);
 	size_t len_replacement = strlen(replacement), len_needle = strlen(needle),
-	       len_haystack = strlen(haystack);
+		len_haystack = strlen(haystack);
 
 	if(ptr != (char*) NULL) {
 #ifdef INTERNAL_ERROR_HANDLING
@@ -997,6 +997,40 @@ char *read_file_descriptor(int fd)
 }
 #endif /* #ifdef ENABLE_READ_DATA */
 
+char *read_file(const char *path)
+{
+	char *ptr;
+	int fd;
+
+#ifdef INTERNAL_ERROR_HANDLING
+#if defined(__linux__) && defined(_GNU_SOURCE)
+	fd = xopen(path, O_RDONLY | O_CLOEXEC);
+#else
+	fd = xopen(path, O_RDONLY);
+	if(fcntl(fd, F_SETFD, FD_CLOEXEC) != 0) {
+		log_message(LOG_FATAL, "Failed setting FD_CLOEXEC flag on file descriptor: %s", strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+#endif /* #if defined(__linux__) && defined(_GNU_SOURCE) */
+#else
+#if defined(__linux__) && defined(_GNU_SOURCE)
+	fd = open(path, O_RDONLY | O_CLOEXEC);
+#else
+	fd = xopen(path, O_RDONLY);
+	if(fcntl(fd, F_SETFD, FD_CLOEXEC) != 0)
+		log_message(LOG_FATAL, "Failed setting FD_CLOEXEC flag on file descriptor: %s", strerror(errno));
+#endif /* #if defined(__linux__) && defined(_GNU_SOURCE) */
+	if(unlikely(fd == -1))
+		return (char*) NULL;
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
+
+	ptr = read_file_descriptor(fd);
+	close(fd);
+
+	return ptr;
+}
+
+
 
 /* -------------------- DATA STRUCTURES -------------------- */
 #ifdef ENABLE_DATASTRUCTS
@@ -1155,7 +1189,7 @@ DLinkedList dll_copy_interator(DLinkedList dl)
 }
 #if 0
 /* TODO: finish implementing */
-DLinkedList dll_clone(DLinkedList dl, void *(*__clonefunc__)(void*))
+DLinkedList clone_dll(DLinkedList dl, void *(*__clonefunc__)(void*))
 {
 	failwith("function not yet implemented");
 	__datastruct_elem__ *e, *e_copy;
@@ -1364,40 +1398,63 @@ void *queue_peek(Queue q)
 }
 
 /* ----- Bitset ----- */
-bitset new_bitset(size_t size)
+Bitset new_bitset(size_t size)
 {
 	size_t mem = (size >> 3) + (size % 8 != 0);
+	Bitset b;
 #ifdef INTERNAL_ERROR_HANDLING
-	bitset b = (bitset) xmalloc(mem);
+	b = (Bitset) xmalloc(sizeof(__bitset_struct__) + mem);
 #else
-	bitset b = (bitset) malloc(mem);
-	if(likely(b != (bitset) NULL))
+	b = (Bitset) malloc(sizeof(__bitset_struct__) + mem);
+	if(likely(b != (Bitset) NULL))
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
-		memset(b, 0, mem);
+		memset(b->data, 0, mem);
+	b->size = size;
 	return b;
 }
 
-int getbit(const bitset set, int pos)
+Bitset clone_bitset(Bitset set)
 {
-	return (set[pos >> 3] >> (pos % 8)) & 1;
+	Bitset set_clone;
+	size_t mem = (set->size >> 3) + (set->size % 8 != 0);
+
+#ifdef INTERNAL_ERROR_HANDLING
+	set_clone = (Bitset) xmalloc(sizeof(__bitset_struct__) + mem);
+#else
+	set_clone = (Bitset) malloc(sizeof(__bitset_struct__) + mem);
+	if(likely(set_clone != (Bitset) NULL)) {
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
+		memcpy(set_clone->data, set->data, mem);
+		set_clone->size = set->size;
+#ifndef INTERNAL_ERROR_HANDLING
+	}
+#endif /* #ifndef INTERNAL_ERROR_HANDLING */
+
+	return set_clone;
 }
 
-void setbit(bitset set, int pos)
+int getbit(const Bitset set, int pos)
 {
-	set[pos >> 3] |= (1 << (pos % 8));
+	return (set->data[pos >> 3] >> (pos % 8)) & 1;
 }
 
-void unsetbit(bitset set, int pos)
+void setbit(Bitset set, int pos)
 {
-	set[pos >> 3] &= ~(1 << (pos % 8));
+	set->data[pos >> 3] |= (1 << (pos % 8));
 }
 
-int togglebit(bitset set, int pos)
+void unsetbit(Bitset set, int pos)
 {
-	set[pos >> 3] ^= 1 << pos % 8;
-	return (set[pos >> 3] >> (pos % 8)) & 1;
+	set->data[pos >> 3] &= ~(1 << (pos % 8));
 }
-#endif /* #ifdef ENABLE_BITSET */
+
+int togglebit(Bitset set, int pos)
+{
+	set->data[pos >> 3] ^= 1 << pos % 8;
+
+	return (set->data[pos >> 3] >> (pos % 8)) & 1;
+}
+#endif /* #ifdef ENABLE_Bitset */
 
 
 /* -------------------- Filesystem functions -------------------- */
@@ -1418,6 +1475,7 @@ int is_dir(const char *path)
 #else
 #define FILE_SEPARATOR	'/'
 #endif /* #ifdef _WIN32 */
+
 #undef make_path
 char *make_path(const char *path, ...)
 {
@@ -1448,7 +1506,9 @@ char *make_path(const char *path, ...)
 	return new_path;
 }
 #undef FILE_SEPARATOR
-#define make_path(...)	make_path(__VA_ARGS__, (char*) NULL)
+#ifdef C99
+# define make_path(...)	make_path(__VA_ARGS__, (char*) NULL)
+#endif /* #ifdef C99 */
 
 void *dirwalk(const char *path, BOOL_TYPE recurse, void *(*func)(char*, void*), void *arg)
 {
@@ -1472,7 +1532,11 @@ void *dirwalk(const char *path, BOOL_TYPE recurse, void *(*func)(char*, void*), 
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
 			while((ret = readdir_r(dir, entry, &result)) == 0 && result != (struct dirent*) NULL)
 				if(strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) {
+#ifdef C99
 					new_path = make_path(path, entry->d_name);
+#else
+					new_path = make_path(path, entry->d_name, NULL);
+#endif /* #ifdef C99 */
 #ifndef INTERNAL_ERROR_HANDLING
 					if(unlikely(new_path == (char*) NULL)) {
 						closedir(dir);
@@ -1739,22 +1803,21 @@ int normal_getchar(void)
 /* -------------------- Threading -------------------- */
 #ifdef ENABLE_THREADING
 
-pthread_t launch_thread(void *(*start_routine)(void*), void *arg, int detach)
+pthread_t launch_thread(void *(*start_routine)(void*), void *arg, const pthread_attr_t *attr)
 {
 	pthread_t th;
-	if(pthread_create(&th, (const pthread_attr_t*) NULL, start_routine, arg) != 0) {
+	if(pthread_create(&th, attr, start_routine, arg) != 0) {
 		log_message(LOG_ERROR, "Error creating thread: %s", strerror(errno));
 		th = 0;
-	} else if(detach && pthread_detach(th) != 0)
-		log_message(LOG_ERROR, "Error detaching thread: %s", strerror(errno));
+	}
 	return th;
 }
 
 #ifdef ENABLE_ERROR_HANDLING
 
-pthread_t xlaunch_thread(void *(*start_routine)(void*), void *arg, int detach)
+pthread_t xlaunch_thread(void *(*start_routine)(void*), void *arg, const pthread_attr_t *attr)
 {
-	pthread_t th = launch_thread(start_routine, arg, detach);
+	pthread_t th = launch_thread(start_routine, arg, attr);
 	if(th == 0) {
 		log_message(LOG_FATAL, "Thread not created: %s", strerror(errno));
 		exit(EXIT_FAILURE);
@@ -1816,7 +1879,7 @@ void *mempool_alloc(struct mempool *mp)
 	/*
 	 * Problem when enlarging memory pool: mp->mem will point to a different chunk of mem,
 	 * but the pointers pointing to the memory in the mempool will not be updated. Not much
-	 * we can do about that => let's  disable pool enlarging
+	 * we can do about that => let's disable pool enlarging
 	 */
 	/*
 	 * unsigned i;
@@ -1830,7 +1893,7 @@ void *mempool_alloc(struct mempool *mp)
 	 *	for(i = 0; i < mp->nmemb; i++) {
 	 *		mp->ptrs[i] = val;
 	 *		val += sizeof(unsigned) + mp->size;
- 	 *	}
+	 *	}
 	 * }
 	 */
 	if(mp->index < mp->nmemb) {
@@ -1952,7 +2015,7 @@ Mmap *mopen(const char *path, const char *mode)
 #ifdef INTERNAL_ERROR_HANDLING
 	i = xopen(path, o_flags);
 #if (! defined(__linux__)) || (! defined(_GNU_SOURCE))
-	if(fcntl(i, F_SETFD, FD_CLOEXEC) != 0) {
+	if(unlikely(fcntl(i, F_SETFD, FD_CLOEXEC) != 0)) {
 		log_message(LOG_FATAL, "Failed setting FD_CLOEXEC flag on file descriptor: %s", strerror(errno));
 		exit(EXIT_FAILURE);
 	}
@@ -1976,6 +2039,13 @@ Mmap *mopen(const char *path, const char *mode)
 		free(f);
 		return (Mmap*) NULL;
 	}
+#if (! defined(__linux__)) || (! defined(_GNU_SOURCE))
+	if(unlikely(fcntl(i, F_SETFD, FD_CLOEXEC) != 0)) {
+		close(i);
+		free(f);
+		return (Mmap*) NULL;
+	}
+#endif /* #if (! defined(__linux__)) || (! defined(_GNU_SOURCE)) */
 	if(unlikely((offset = lseek(i, 0, SEEK_END)) == -1)) {
 		close(i);
 		free(f);
@@ -2045,7 +2115,7 @@ int mgetc(Mmap *f)
 				f->offset == (byte*) NULL || f->endptr == (byte*) NULL))
 		errno = EBADF;
 	else
-		ret = f->offset < f->endptr ? (int) *f->offset++ :  EOF;
+		ret = f->offset < f->endptr ? (int) *f->offset++ : EOF;
 	return ret;
 }
 
@@ -2187,8 +2257,8 @@ off_t mseek(Mmap *f, off_t offset, int whence)
 #if defined(_GNU_SOURCE) && (( defined(__linux__) && LINUX_VERSION_CODE >=\
 			KERNEL_VERSION(3, 1, 0) ) || defined(__DragonFly__) ||\
 		defined(__FreeBSD__) || (defined(__sun) && defined(__SVR4)))
-/* man lseek(3) for compatibility. Current compatibility (2016/01/11) includes
- * GNU-Linux for kernels 3.1.0+, DragonFlyBSD, FreeBSD and Solaris */
+				/* man lseek(3) for compatibility. Current compatibility (2016/01/11) includes
+				 * GNU-Linux for kernels 3.1.0+, DragonFlyBSD, FreeBSD and Solaris */
 			case SEEK_DATA:
 				if(f->offset >= f->endptr || f->offset + offset >= f->endptr)
 					errno = ENXIO;
@@ -2202,8 +2272,8 @@ off_t mseek(Mmap *f, off_t offset, int whence)
 					ret = (off_t) (f->offset = f->endptr + offset);
 				break;
 #endif /* #if defined(_GNU_SOURCE) && ((defined(__linux__) && LINUX_VERSION_CODE >=\
-			KERNEL_VERSION(3, 1, 0)) || defined(__DragonFly__) ||\
-		defined(__FreeBSD__) || (defined(__sun) && defined(__SVR4))) */
+	  KERNEL_VERSION(3, 1, 0)) || defined(__DragonFly__) ||\
+	  defined(__FreeBSD__) || (defined(__sun) && defined(__SVR4))) */
 			default:
 				errno = EINVAL;
 		}
@@ -2246,6 +2316,7 @@ Weekday get_day_of_week(int day, int month, int year)
 	k = year % 100;
 	j = year / 100;
 	d = (day + 13 * (month + 1) / 5 + k + k / 4 + j / 4 + 5 * j) % 7;
+
 	return d <= 1 ? d + 5 : d - 2;
 }
 
@@ -2342,6 +2413,7 @@ void *initialize_vector(void *dest, const void *src, size_t size, size_t nmemb)
 	return dest;
 }
 
+/* TODO: add possibility to modify sa_flags and sa_mask. See sigaction(2) for more info */
 void register_signal_handler(int signum, void (*sighandler)(int))
 {
 	struct sigaction new_sigaction;
@@ -2357,8 +2429,7 @@ void register_signal_handler(int signum, void (*sighandler)(int))
 }
 
 /* From
-http://www.emoticode.net/c/an-example-log-function-using-different-log-levels-and-variadic-macros.html
-*/
+http://www.emoticode.net/c/an-example-log-function-using-different-log-levels-and-variadic-macros.html */
 static log_level_t __g_loglevel = LOG_DEBUG;
 static FILE *__g_loghandle = (FILE*) NULL;
 
