@@ -12,7 +12,7 @@
  * See the GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License along
- * with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #ifndef UTILS_H
@@ -41,7 +41,7 @@
 /* Easily read data from streams/file descriptors */
 #define ENABLE_READ_DATA
 
-/* Data structures: double linked list, stack, queue, bitset */
+/* Data structures: double linked list, stack, queue, Bitset */
 #define ENABLE_DATASTRUCTS
 
 /* Directory navigation functions */
@@ -55,7 +55,7 @@
 #define ENABLE_TERMIOS_MANIPULATION
 
 /* Threading functions. Still very basic */
-/* #define ENABLE_THREADING */
+#define ENABLE_THREADING
 
 /* Memory pool, to cache heap memory and avoid having to call malloc. Idea is that
  * we often ask for same memory sizes (nodes in a linked list or tree, data structures
@@ -259,9 +259,9 @@ void str_tolower(char *str);
 /* sets str to upper case */
 void str_toupper(char *str);
 
-#if (! defined(__linux__)) && (! defined(BSD))
+#if (! defined(__linux__)) && (! defined(BSD)) && (! defined(__MACH__))
 char *stpcpy(char *dest, const char *src);
-#endif /* #if (! defined(__linux__)) && (! defined(BSD)) */
+#endif /* #if (! defined(__linux__)) && (! defined(BSD)) && (! defined(__MACH__)) */
 
 #ifndef __linux__
 char *strchrnul(const char *s, int c);
@@ -384,9 +384,6 @@ void funlockfile(FILE *filehandle);
 int getc_unlocked(FILE *stream);
 #endif /* #if defined(__sun) && defined(__SVR4) */
 
-/* for compatibility with old code. Deprecated */
-/* #define readLine	read_line */
-
 /* Use fgets without a preallocated buffer. free() when done */
 #define afgets(stream) getline(NULL, 0, (stream))
 
@@ -437,7 +434,22 @@ void delete_mempool(struct mempool *mp);
 
 /* -------------------- DATA STRUCTURES -------------------- */
 #ifdef ENABLE_DATASTRUCTS
-#include <malloc.h>
+
+/*ISO C forbids zero-size array ‘data’ */
+#define __ARRAY_SIZEOF_DATA_ELEM	1
+#ifdef C89
+# define __SIZEOF_ARRAY_STRUCT	(offsetof(struct __array_data__, data))
+#else
+/* Must be updated manually when redefining struct __array_data__ */
+# define __SIZEOF_ARRAY_STRUCT	(sizeof(size_t) << 1)
+#endif
+
+/* Must manually update __SIZEOF_ARRAY_STRUCT a few lines above when
+ * redefining struct __array_data__ */
+struct __array_data__ {
+	size_t size, nmemb;
+	byte data[__ARRAY_SIZEOF_DATA_ELEM];
+};
 
 typedef struct __datastruct_elem__ {
 	void *data;
@@ -497,23 +509,30 @@ void *queue_pop(Queue q);
 void *queue_peek(Queue q);
 
 /* ----- Bitset ----- */
-typedef byte *bitset;
+typedef struct {
+	size_t size;
+	byte data[1];
+} __bitset_struct__;
 
-bitset new_bitset(size_t size);
+typedef __bitset_struct__ *Bitset;
+
+Bitset new_bitset(size_t size);
 
 #define free_bitset	free
 
+Bitset clone_bitset(const Bitset set);
+
 /* obtain bit at position pos from set array */
-int getbit(const bitset set, int pos);
+int getbit(const Bitset set, int pos);
 
 /* set bit at position pos to 1 */
-void setbit(bitset set, int pos);
+void setbit(Bitset set, int pos);
 
 /* set bit at position pos to 0 */
-void unsetbit(bitset set, int pos);
+void unsetbit(Bitset set, int pos);
 
 /* flip bit at position pos */
-int togglebit(bitset set, int pos);
+int togglebit(Bitset set, int pos);
 
 #endif /* #ifdef ENABLE_DATASTRUCTS */
 
@@ -648,12 +667,12 @@ int normal_getchar(void);
 #define NO_DETACH_THREAD	0
 
 /* launches start_routine in a new thread with arg as argument. detach is a flag
- * to tell if we should call pthread_detach on new thread or not.
- * Returns thread id variable */
-pthread_t launch_thread(void *(start_routine)(void*), void *arg, int detach);
+ * to tell if we should call pthread_detach on new thread or not (see
+ * pthread_detach(3) for more details). Returns thread id variable */
+pthread_t launch_thread(void *(*start_routine)(void*), void *arg, const pthread_attr_t *attr);
 
 #ifdef ENABLE_ERROR_HANDLING
-pthread_t xlaunch_thread(void *(*start_routine)(void*), void *arg, int detach);
+pthread_t xlaunch_thread(void *(*start_routine)(void*), void *arg, const pthread_attr_t *attr);
 
 void *xpthread_join(pthread_t thread);
 #endif /* #ifdef ENABLE_ERROR_HANDLING */
