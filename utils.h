@@ -12,7 +12,7 @@
  * See the GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License along
- * with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #ifndef UTILS_H
@@ -259,9 +259,9 @@ void str_tolower(char *str);
 /* sets str to upper case */
 void str_toupper(char *str);
 
-#if (! defined(__linux__)) && (! defined(BSD))
+#if (! defined(__linux__)) && (! defined(BSD)) && (! defined(__MACH__))
 char *stpcpy(char *dest, const char *src);
-#endif /* #if (! defined(__linux__)) && (! defined(BSD)) */
+#endif /* #if (! defined(__linux__)) && (! defined(BSD)) && (! defined(__MACH__)) */
 
 #ifndef __linux__
 char *strchrnul(const char *s, int c);
@@ -401,6 +401,8 @@ char *read_file_descriptor(int fd);
 	while((__c__ = getc(stream)) != EOF && __c__ != '\n');\
 }
 
+char *read_file(const char *path);
+
 #endif /* #ifdef ENABLE_READ_DATA */
 
 
@@ -434,15 +436,23 @@ void delete_mempool(struct mempool *mp);
 
 /* -------------------- DATA STRUCTURES -------------------- */
 #ifdef ENABLE_DATASTRUCTS
-#include <malloc.h>
 
+#include <stddef.h>
 /*ISO C forbids zero-size array ‘data’ */
-#define __ARRAY_SIZEOF_DATA__	1
+#define __ARRAY_SIZEOF_DATA_ELEM	1
+#ifdef C89
+# define __SIZEOF_ARRAY_STRUCT	(offsetof(struct __array_data__, data))
+#else
+/* Must be updated manually when redefining struct __array_data__ */
+# define __SIZEOF_ARRAY_STRUCT	(sizeof(size_t) << 1)
+#endif
 
-typedef struct {
+/* Must manually update __SIZEOF_ARRAY_STRUCT a few lines above when
+ * redefining struct __array_data__ */
+struct __array_data__ {
 	size_t size, nmemb;
-	byte data[__ARRAY_SIZEOF_DATA__];
-} __array_data__;
+	byte data[__ARRAY_SIZEOF_DATA_ELEM];
+};
 
 typedef struct __datastruct_elem__ {
 	void *data;
@@ -454,7 +464,7 @@ typedef struct __datastruct__ {
 } __datastruct__;
 
 /* ----- Array ----- */
-typedef __array_data__* Array;
+typedef struct __array_data__* Array;
 
 /* WARNING: size refers to the size of a single element in the array, NOT to the size
  * of the array itself */
@@ -464,7 +474,9 @@ Array array_clone(Array a, void *(*__clonefunc__)(void*));
 Array c_array_to_array(void *data, size_t size, size_t nmemb);
 
 void *array_append(Array a, void *elem);
+#define array_append(a, e)	array_append((a), (void*) (e))
 void *array_insert(Array a, void *elem, size_t index);
+#define array_insert(a, e, i)	array_append((a), (void*) (e), (i))
 Array array_filter(Array a, BOOL_TYPE (*__filterfunc__)(void*));
 void *array_map(Array a, void *(*__mapfunc__)(void *data, void *arg), void *arg);
 void array_sort(Array a, int (*__cmpfunc__)(void *e1, void *e2));

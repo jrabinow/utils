@@ -12,7 +12,7 @@
  * See the GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License along
- * with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "utils.h"
@@ -81,7 +81,7 @@ void *xmalloc(size_t size)
 
 	do {
 		ptr = malloc(size);
-		if(likely(ptr != (void*) NULL))
+		if(likely(ptr != (void*) NULL) || size == 0)
 			break;
 #ifdef __unix__
 		switch(errno) {
@@ -120,7 +120,7 @@ void *xcalloc(size_t nmemb, size_t size)
 
 	do {
 		ptr = calloc(nmemb, size);
-		if(likely(ptr != (void*) NULL))
+		if(likely(ptr != (void*) NULL) || size == 0 || nmemb == 0)
 			break;
 #ifdef __unix__
 		switch(errno) {
@@ -159,7 +159,7 @@ char *xstrdup(const char *str)
 
 	do {
 		ptr = strdup(str);
-		if(ptr != (char*) NULL)
+		if(likely(ptr != (char*) NULL))
 			break;
 #ifdef __unix__
 		switch(errno) {
@@ -197,7 +197,7 @@ void *xrealloc(void *ptr, size_t size)
 
 	do {
 		ptr = realloc(ptr, size);
-		if(likely(ptr != (void*) NULL))
+		if(likely(ptr != (void*) NULL) || size == 0)
 			break;
 #ifdef __unix__
 		switch(errno) {
@@ -443,7 +443,7 @@ void str_toupper(char *str)
 			*str = *str - 32;	/* + 'A' - 'a' */
 }
 
-#if (! defined(__linux__)) && (! defined(BSD))
+#if (! defined(__linux__)) && (! defined(BSD)) && (! defined(__MACH__))
 char *stpcpy(char *dest, const char *src)
 {
 	size_t len = strlen(src);
@@ -452,7 +452,7 @@ char *stpcpy(char *dest, const char *src)
 
 	return dest + 1;
 }
-#endif /* #if (! defined(__linux__)) && (! defined(BSD)) */
+#endif /* #if (! defined(__linux__)) && (! defined(BSD)) && (! defined(__MACH__)) */
 
 #ifndef __linux__
 char *strchrnul(const char *s, int c)
@@ -689,7 +689,7 @@ char *replace_str(const char *haystack, const char *needle, const char *replacem
 	char *new_str = (char*) NULL;
 	char *ptr = strstr(haystack, needle);
 	size_t len_replacement = strlen(replacement), len_needle = strlen(needle),
-	       len_haystack = strlen(haystack);
+		len_haystack = strlen(haystack);
 
 	if(ptr != (char*) NULL) {
 #ifdef INTERNAL_ERROR_HANDLING
@@ -897,12 +897,17 @@ char *read_line(FILE *stream)
 		return (char*) NULL;
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
 
-#ifdef _POSIX_THREAD_SAFE_FUNCTIONS	/* locking and getc_unlocked functions */
+#if defined(_POSIX_THREAD_SAFE_FUNCTIONS) && (_POSIX_C_SOURCE >= 1 || \
+	defined(_XOPEN_SOURCE) || defined(POSIX_SOURCE) || \
+		defined(_BSD_SOURCE) || defined(_SVID_SOURCE))
+		/* locking and getc_unlocked functions */
 	flockfile(stream);
 	while((c = getc_unlocked(stream)) != EOF && c != '\n')
 #else
 		while((c = getc(stream)) != EOF && c != '\n')
-#endif /* #ifdef _POSIX_THREAD_SAFE_FUNCTIONS */
+#endif /* #if defined(_POSIX_THREAD_SAFE_FUNCTIONS) && (_POSIX_C_SOURCE >= 1 || \
+	defined(_XOPEN_SOURCE) || defined(POSIX_SOURCE) || \
+		defined(_BSD_SOURCE) || defined(_SVID_SOURCE)) */
 		{
 			if(i == current_size) {
 #ifdef INTERNAL_ERROR_HANDLING
@@ -915,9 +920,13 @@ char *read_line(FILE *stream)
 			}
 			str[i++] = c;
 		}
-#ifdef _POSIX_THREAD_SAFE_FUNCTIONS
+#if defined(_POSIX_THREAD_SAFE_FUNCTIONS) && (_POSIX_C_SOURCE >= 1 || \
+	defined(_XOPEN_SOURCE) || defined(POSIX_SOURCE) || \
+		defined(_BSD_SOURCE) || defined(_SVID_SOURCE))
 	funlockfile(stream);
-#endif /* #ifdef _POSIX_THREAD_SAFE_FUNCTIONS */
+#endif /* #if defined(_POSIX_THREAD_SAFE_FUNCTIONS) && (_POSIX_C_SOURCE >= 1 || \
+	defined(_XOPEN_SOURCE) || defined(POSIX_SOURCE) || \
+		defined(_BSD_SOURCE) || defined(_SVID_SOURCE)) */
 	if(i == current_size) {
 #ifdef INTERNAL_ERROR_HANDLING
 		str = (char*) xrealloc(str, current_size += 1);
@@ -995,7 +1004,6 @@ char *read_file_descriptor(int fd)
 	}
 	return str;
 }
-#endif /* #ifdef ENABLE_READ_DATA */
 
 char *read_file(const char *path)
 {
@@ -1029,6 +1037,7 @@ char *read_file(const char *path)
 
 	return ptr;
 }
+#endif /* #ifdef ENABLE_READ_DATA */
 
 
 
@@ -1040,9 +1049,9 @@ char *read_file(const char *path)
 Array new_array(size_t size)
 {
 #ifdef INTERNAL_ERROR_HANDLING
-	Array a = (Array) xmalloc(sizeof(__array_data__) - __ARRAY_SIZEOF_DATA__ + __ARRAY_START_NMEMB * size);
+	Array a = (Array) xmalloc(__SIZEOF_ARRAY_STRUCT + __ARRAY_START_NMEMB * size);
 #else
-	Array a = (Array) malloc(sizeof(__array_data__) - __ARRAY_SIZEOF_DATA__ + __ARRAY_START_NMEMB * size);
+	Array a = (Array) malloc(__SIZEOF_ARRAY_STRUCT + __ARRAY_START_NMEMB * size);
 	if(likely(a != (Array) NULL)) {
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
 		a->size = size;
@@ -1067,9 +1076,9 @@ Array c_array_to_array(void *data, size_t size, size_t nmemb)
 	incr |= incr >> 32;
 	incr++;
 #ifdef INTERNAL_ERROR_HANDLING
-	a = (Array) xmalloc(sizeof(__array_data__) - __ARRAY_SIZEOF_DATA__ + incr * size);
+	a = (Array) xmalloc(__SIZEOF_ARRAY_STRUCT + incr * size);
 #else
-	a = (Array) malloc(sizeof(__array_data__) - __ARRAY_SIZEOF_DATA__ + incr * size);
+	a = (Array) malloc(__SIZEOF_ARRAY_STRUCT + incr * size);
 	if(likely(a != (Array) NULL)) {
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
 		a->size = size;
@@ -1080,6 +1089,7 @@ Array c_array_to_array(void *data, size_t size, size_t nmemb)
 #endif /* #ifndef INTERNAL_ERROR_HANDLING */
 	return a;
 }
+
 Array clone_array(Array a, void *(*__clonefunc__)(void*))
 {
 	Array a_copy = (Array) NULL;
@@ -1094,9 +1104,9 @@ Array clone_array(Array a, void *(*__clonefunc__)(void*))
 	incr |= incr >> 32;
 	incr++;
 #ifdef INTERNAL_ERROR_HANDLING
-	a_copy = (Array) xmalloc(sizeof(__array_data__) - __ARRAY_SIZEOF_DATA__ + incr * a->size);
+	a_copy = (Array) xmalloc(__SIZEOF_ARRAY_STRUCT + incr * a->size);
 #else
-	a_copy = (Array) malloc(sizeof(__array_data__) - __ARRAY_SIZEOF_DATA__ + incr * a->size);
+	a_copy = (Array) malloc(__SIZEOF_ARRAY_STRUCT + incr * a->size);
 	if(likely(a_copy != (Array) NULL)) {
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
 		if(__clonefunc__ == (void *(*)(void*)) NULL)
@@ -1113,16 +1123,21 @@ Array clone_array(Array a, void *(*__clonefunc__)(void*))
 	return a_copy;
 }
 
+#undef array_append
 void *array_append(Array a, void *elem)
 {
-	if(a->nmemb >= __ARRAY_START_NMEMB && (a->nmemb & (a->nmemb - 1)) == 0)
+	if(unlikely(a->nmemb >= __ARRAY_START_NMEMB && (a->nmemb & (a->nmemb - 1)) == 0))
 #ifdef INTERNAL_ERROR_HANDLING
-		a = (void*) xrealloc(a, sizeof(__array_data__) + a->size * (a->nmemb << 1));
+	{
+		a = (Array) xrealloc(a, __SIZEOF_ARRAY_STRUCT + a->size * (a->nmemb << 1));
+	}
 #else
-	a = (void*) realloc(a, sizeof(__array_data__) + a->size * (a->nmemb << 1));
-	if(likely(a != (void*) NULL))
+	{
+		a = (Array) realloc(a, __SIZEOF_ARRAY_STRUCT + a->size * (a->nmemb << 1));
+	}
+	if(likely(a != (Array) NULL))
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
-		*(void**) (a->data + a->size * a->nmemb++) = elem;
+		memcpy(a->data + a->size * a->nmemb++, elem, a->size);
 #ifndef INTERNAL_ERROR_HANDLING
 	else
 		return (void*) NULL;
@@ -1130,6 +1145,7 @@ void *array_append(Array a, void *elem)
 	return elem;
 }
 
+#undef array_insert
 void *array_insert(Array a, void *elem, size_t index)
 {
 	size_t incr;
@@ -1144,14 +1160,14 @@ void *array_insert(Array a, void *elem, size_t index)
 		incr |= incr >> 32;
 		incr++;
 #ifdef INTERNAL_ERROR_HANDLING
-		a = (void*) xrealloc(a, sizeof(__array_data__) + incr * a->size);
+		a = (void*) xrealloc(a, __SIZEOF_ARRAY_STRUCT + incr * a->size);
 #else
-		a = (void*) realloc(a, sizeof(__array_data__) + incr * a->size);
+		a = (void*) realloc(a, __SIZEOF_ARRAY_STRUCT + incr * a->size);
 		if(unlikely(a) == (void*) NULL)
 			return (void*) NULL;
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
 	}
-	*(void**) (a->data + a->size * index) = elem;
+	memcpy(a->data + a->size * index, elem, a->size);
 
 	return elem;
 }
@@ -1170,16 +1186,16 @@ Array array_filter(Array a, BOOL_TYPE (*__filterfunc__)(void*))
 	incr |= incr >> 32;
 	incr++;
 #ifdef INTERNAL_ERROR_HANDLING
-	filtered = (Array) xmalloc(sizeof(__array_data__) - __ARRAY_SIZEOF_DATA__ + incr * a->size);
+	filtered = (Array) xmalloc(__SIZEOF_ARRAY_STRUCT + incr * a->size);
 #else
-	filtered = (Array) malloc(sizeof(__array_data__) - __ARRAY_SIZEOF_DATA__ + incr * a->size);
+	filtered = (Array) malloc(__SIZEOF_ARRAY_STRUCT + incr * a->size);
 	if(likely(a_copy != (Array) NULL)) {
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
 		filtered->size = a->size;
 		filtered->nmemb = 0;
-		for(incr = 0, j = 0; incr < numbytes; incr += a->size)
+		for(incr = 0, j = 0; incr < numbytes; incr += a->size, j += a->size)
 			if(__filterfunc__(*(void**) (a->data + a->size * j)))
-				*(void**) (filtered->data + filtered->size * incr) = a->data + a->size * j;
+				memcpy(filtered->data + filtered->size * incr, a->data + a->size * j, a->size);
 #ifndef INTERNAL_ERROR_HANDLING
 	}
 #endif /* #ifndef INTERNAL_ERROR_HANDLING */
@@ -1674,7 +1690,7 @@ char *make_path(const char *path, ...)
 }
 #undef FILE_SEPARATOR
 #ifdef C99
-#define make_path(...)	make_path(__VA_ARGS__, (char*) NULL)
+# define make_path(...)	make_path(__VA_ARGS__, (char*) NULL)
 #endif /* #ifdef C99 */
 
 void *dirwalk(const char *path, BOOL_TYPE recurse, void *(*func)(char*, void*), void *arg)
@@ -2046,7 +2062,7 @@ void *mempool_alloc(struct mempool *mp)
 	/*
 	 * Problem when enlarging memory pool: mp->mem will point to a different chunk of mem,
 	 * but the pointers pointing to the memory in the mempool will not be updated. Not much
-	 * we can do about that => let's  disable pool enlarging
+	 * we can do about that => let's disable pool enlarging
 	 */
 	/*
 	 * unsigned i;
@@ -2282,7 +2298,7 @@ int mgetc(Mmap *f)
 				f->offset == (byte*) NULL || f->endptr == (byte*) NULL))
 		errno = EBADF;
 	else
-		ret = f->offset < f->endptr ? (int) *f->offset++ :  EOF;
+		ret = f->offset < f->endptr ? (int) *f->offset++ : EOF;
 	return ret;
 }
 
