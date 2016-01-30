@@ -74,6 +74,7 @@ void xfree(void *ptr)
 
 /* -------------------- ERROR HANDLING -------------------- */
 #if defined(ENABLE_ERROR_HANDLING) || defined(INTERNAL_ERROR_HANDLING)
+
 void *xmalloc(size_t size)
 {
 	void *ptr = (void*) NULL;
@@ -310,6 +311,7 @@ FILE *xfdopen(int fd, const char *mode)
 }
 
 #ifdef __unix__
+
 int xopen(const char *path, int flags, ...)
 {
 	int fd, count = 0, mode = 0;
@@ -1291,7 +1293,7 @@ void *stack_push(Stack *s, void *data)
 	__datastruct_elem__ *new = (__datastruct_elem__*) xmalloc(sizeof(__datastruct_elem__));
 #else
 	__datastruct_elem__ *new = (__datastruct_elem__*) malloc(sizeof(__datastruct_elem__));
-	if(new != NULL) {
+	if(likely(new != NULL)) {
 #endif	/* #ifdef INTERNAL_ERROR_HANDLING */
 		new->data = data;
 		new->next = *s;
@@ -1308,7 +1310,7 @@ void *stack_pop(Stack *s)
 	void *ret = (void*) NULL;
 	Stack new;
 
-	if(*s != (Stack) NULL) {
+	if(likely(*s != (Stack) NULL)) {
 		ret = (*s)->data;
 		new = (*s)->next;
 		free(*s);
@@ -1329,7 +1331,7 @@ Queue new_queue(void)
 	Queue q = (Queue) xmalloc(sizeof(__datastruct__));
 #else
 	Queue q = (Queue) malloc(sizeof(__datastruct__));
-	if(q != (Queue) NULL) {
+	if(likely(q != (Queue) NULL)) {
 #endif	/* #ifdef INTERNAL_ERROR_HANDLING */
 		q->in = (__datastruct_elem__*) NULL;
 		q->out = (__datastruct_elem__*) NULL;
@@ -1343,23 +1345,21 @@ void delete_queue(Queue q, void (*__del__)(void*))
 {
 	__datastruct_elem__ *temp, *iterator;
 
-	if(q != (Queue) NULL) {
-		iterator = q->in;
-		if(__del__ != (void(*)(void*)) NULL)
-			while(iterator != (__datastruct_elem__*) NULL) {
-				__del__(iterator->data);
-				temp = iterator;
-				iterator = iterator->next;
-				free(temp);
-			}
-		else
-			while(iterator != (__datastruct_elem__*) NULL) {
-				temp = iterator;
-				iterator = iterator->next;
-				free(temp);
-			}
-		free(q);
-	}
+	iterator = q->in;
+	if(__del__ != (void(*)(void*)) NULL)
+		while(iterator != (__datastruct_elem__*) NULL) {
+			__del__(iterator->data);
+			temp = iterator;
+			iterator = iterator->next;
+			free(temp);
+		}
+	else
+		while(iterator != (__datastruct_elem__*) NULL) {
+			temp = iterator;
+			iterator = iterator->next;
+			free(temp);
+		}
+	free(q);
 }
 
 void queue_push(Queue q, void *data)
@@ -1369,7 +1369,7 @@ void queue_push(Queue q, void *data)
 #else
 	__datastruct_elem__ *new = (__datastruct_elem__*) malloc(sizeof(__datastruct_elem__));
 
-	if(new != (__datastruct_elem__*) NULL) {
+	if(likely(new != (__datastruct_elem__*) NULL)) {
 #endif	/* #ifdef INTERNAL_ERROR_HANDLING */
 		new->data = data;
 		new->next = (__datastruct_elem__*) NULL;
@@ -1388,14 +1388,14 @@ void *queue_pop(Queue q)
 	void *ret = (void*) NULL;
 	__datastruct_elem__ *temp;
 
-	if(q->out != (__datastruct_elem__*) NULL) {
+	if(q->out != (__datastruct_elem__*) NULL)
 		ret = q->out->data;
-		temp = q->out;
-		q->out = temp->next;
-		if(q->out == (__datastruct_elem__*) NULL)
-			q->in = (__datastruct_elem__*) NULL;
-		free(temp);
-	}
+	temp = q->out;
+	q->out = temp->next;
+	if(q->out == (__datastruct_elem__*) NULL)
+		q->in = (__datastruct_elem__*) NULL;
+	free(temp);
+
 	return ret;
 }
 
