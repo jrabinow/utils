@@ -1086,40 +1086,6 @@ byte *read_file(const char *path, ssize_t *n)
 }
 #endif /* #ifdef ENABLE_READ_DATA */
 
-char *read_file(const char *path)
-{
-	char *ptr;
-	int fd;
-
-#ifdef INTERNAL_ERROR_HANDLING
-#if defined(__linux__) && defined(_GNU_SOURCE)
-	fd = xopen(path, O_RDONLY | O_CLOEXEC);
-#else
-	fd = xopen(path, O_RDONLY);
-	if(fcntl(fd, F_SETFD, FD_CLOEXEC) != 0) {
-		log_message(LOG_FATAL, "Failed setting FD_CLOEXEC flag on file descriptor: %s", strerror(errno));
-		exit(EXIT_FAILURE);
-	}
-#endif /* #if defined(__linux__) && defined(_GNU_SOURCE) */
-#else
-#if defined(__linux__) && defined(_GNU_SOURCE)
-	fd = open(path, O_RDONLY | O_CLOEXEC);
-#else
-	fd = xopen(path, O_RDONLY);
-	if(fcntl(fd, F_SETFD, FD_CLOEXEC) != 0)
-		log_message(LOG_FATAL, "Failed setting FD_CLOEXEC flag on file descriptor: %s", strerror(errno));
-#endif /* #if defined(__linux__) && defined(_GNU_SOURCE) */
-	if(unlikely(fd == -1))
-		return (char*) NULL;
-#endif /* #ifdef INTERNAL_ERROR_HANDLING */
-
-	ptr = read_file_descriptor(fd);
-	close(fd);
-
-	return ptr;
-}
-
-
 
 
 /* -------------------- DATA STRUCTURES -------------------- */
@@ -1130,9 +1096,9 @@ char *read_file(const char *path)
 Array new_array(size_t size)
 {
 #ifdef INTERNAL_ERROR_HANDLING
-	Array a = (Array) xmalloc(sizeof(__array_data__) - __ARRAY_SIZEOF_DATA__ + __ARRAY_START_NMEMB * size);
+	Array a = (Array) xmalloc(__SIZEOF_ARRAY_STRUCT + __ARRAY_START_NMEMB * size);
 #else
-	Array a = (Array) malloc(sizeof(__array_data__) - __ARRAY_SIZEOF_DATA__ + __ARRAY_START_NMEMB * size);
+	Array a = (Array) malloc(__SIZEOF_ARRAY_STRUCT + __ARRAY_START_NMEMB * size);
 	if(likely(a != (Array) NULL)) {
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
 		a->size = size;
@@ -1157,9 +1123,9 @@ Array c_array_to_array(void *data, size_t size, size_t nmemb)
 	incr |= incr >> 32;
 	incr++;
 #ifdef INTERNAL_ERROR_HANDLING
-	a = (Array) xmalloc(sizeof(__array_data__) - __ARRAY_SIZEOF_DATA__ + incr * size);
+	a = (Array) xmalloc(__SIZEOF_ARRAY_STRUCT + incr * size);
 #else
-	a = (Array) malloc(sizeof(__array_data__) - __ARRAY_SIZEOF_DATA__ + incr * size);
+	a = (Array) malloc(__SIZEOF_ARRAY_STRUCT + incr * size);
 	if(likely(a != (Array) NULL)) {
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
 		a->size = size;
@@ -1170,6 +1136,7 @@ Array c_array_to_array(void *data, size_t size, size_t nmemb)
 #endif /* #ifndef INTERNAL_ERROR_HANDLING */
 	return a;
 }
+
 Array clone_array(Array a, void *(*__clonefunc__)(void*))
 {
 	Array a_copy = (Array) NULL;
@@ -1184,9 +1151,9 @@ Array clone_array(Array a, void *(*__clonefunc__)(void*))
 	incr |= incr >> 32;
 	incr++;
 #ifdef INTERNAL_ERROR_HANDLING
-	a_copy = (Array) xmalloc(sizeof(__array_data__) - __ARRAY_SIZEOF_DATA__ + incr * a->size);
+	a_copy = (Array) xmalloc(__SIZEOF_ARRAY_STRUCT + incr * a->size);
 #else
-	a_copy = (Array) malloc(sizeof(__array_data__) - __ARRAY_SIZEOF_DATA__ + incr * a->size);
+	a_copy = (Array) malloc(__SIZEOF_ARRAY_STRUCT + incr * a->size);
 	if(likely(a_copy != (Array) NULL)) {
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
 		if(__clonefunc__ == (void *(*)(void*)) NULL)
@@ -1203,16 +1170,21 @@ Array clone_array(Array a, void *(*__clonefunc__)(void*))
 	return a_copy;
 }
 
+#undef array_append
 void *array_append(Array a, void *elem)
 {
-	if(a->nmemb >= __ARRAY_START_NMEMB && (a->nmemb & (a->nmemb - 1)) == 0)
+	if(unlikely(a->nmemb >= __ARRAY_START_NMEMB && (a->nmemb & (a->nmemb - 1)) == 0))
 #ifdef INTERNAL_ERROR_HANDLING
-		a = (void*) xrealloc(a, sizeof(__array_data__) + a->size * (a->nmemb << 1));
+	{
+		a = (Array) xrealloc(a, __SIZEOF_ARRAY_STRUCT + a->size * (a->nmemb << 1));
+	}
 #else
-	a = (void*) realloc(a, sizeof(__array_data__) + a->size * (a->nmemb << 1));
-	if(likely(a != (void*) NULL))
+	{
+		a = (Array) realloc(a, __SIZEOF_ARRAY_STRUCT + a->size * (a->nmemb << 1));
+	}
+	if(likely(a != (Array) NULL))
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
-		*(void**) (a->data + a->size * a->nmemb++) = elem;
+		memcpy(a->data + a->size * a->nmemb++, elem, a->size);
 #ifndef INTERNAL_ERROR_HANDLING
 	else
 		return (void*) NULL;
@@ -1220,6 +1192,7 @@ void *array_append(Array a, void *elem)
 	return elem;
 }
 
+#undef array_insert
 void *array_insert(Array a, void *elem, size_t index)
 {
 	size_t incr;
@@ -1234,14 +1207,14 @@ void *array_insert(Array a, void *elem, size_t index)
 		incr |= incr >> 32;
 		incr++;
 #ifdef INTERNAL_ERROR_HANDLING
-		a = (void*) xrealloc(a, sizeof(__array_data__) + incr * a->size);
+		a = (void*) xrealloc(a, __SIZEOF_ARRAY_STRUCT + incr * a->size);
 #else
-		a = (void*) realloc(a, sizeof(__array_data__) + incr * a->size);
+		a = (void*) realloc(a, __SIZEOF_ARRAY_STRUCT + incr * a->size);
 		if(unlikely(a) == (void*) NULL)
 			return (void*) NULL;
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
 	}
-	*(void**) (a->data + a->size * index) = elem;
+	memcpy(a->data + a->size * index, elem, a->size);
 
 	return elem;
 }
@@ -1260,16 +1233,16 @@ Array array_filter(Array a, BOOL_TYPE (*__filterfunc__)(void*))
 	incr |= incr >> 32;
 	incr++;
 #ifdef INTERNAL_ERROR_HANDLING
-	filtered = (Array) xmalloc(sizeof(__array_data__) - __ARRAY_SIZEOF_DATA__ + incr * a->size);
+	filtered = (Array) xmalloc(__SIZEOF_ARRAY_STRUCT + incr * a->size);
 #else
-	filtered = (Array) malloc(sizeof(__array_data__) - __ARRAY_SIZEOF_DATA__ + incr * a->size);
+	filtered = (Array) malloc(__SIZEOF_ARRAY_STRUCT + incr * a->size);
 	if(likely(a_copy != (Array) NULL)) {
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
 		filtered->size = a->size;
 		filtered->nmemb = 0;
-		for(incr = 0, j = 0; incr < numbytes; incr += a->size)
+		for(incr = 0, j = 0; incr < numbytes; incr += a->size, j += a->size)
 			if(__filterfunc__(*(void**) (a->data + a->size * j)))
-				*(void**) (filtered->data + filtered->size * incr) = a->data + a->size * j;
+				memcpy(filtered->data + filtered->size * incr, a->data + a->size * j, a->size);
 #ifndef INTERNAL_ERROR_HANDLING
 	}
 #endif /* #ifndef INTERNAL_ERROR_HANDLING */
@@ -1287,9 +1260,10 @@ void *array_map(Array a, void *(*__mapfunc__)(void *data, void *arg), void *arg)
 	return arg;
 }
 
-void array_sort(Array a, int (*__cmpfunc__)(void *e1, void *e2))
+#define __compar_fn_t int (*)(const void*, const void*)
+void array_sort(Array a, int (*cmpfunc)(void *e1, void *e2))
 {
-	qsort(a->data, a->nmemb, a->size, (__compar_fn_t) __cmpfunc__);
+	qsort(a->data, a->nmemb, a->size, (__compar_fn_t) cmpfunc);
 }
 
 /* ----- Double-linked list ----- */
@@ -1762,7 +1736,7 @@ char *make_path(const char *path, ...)
 }
 #undef FILE_SEPARATOR
 #ifdef C99
-#define make_path(...)	make_path(__VA_ARGS__, (char*) NULL)
+# define make_path(...)	make_path(__VA_ARGS__, (char*) NULL)
 #endif /* #ifdef C99 */
 
 void *dirwalk(const char *path, BOOL_TYPE recurse, void *(*func)(char*, void*), void *arg)

@@ -466,6 +466,7 @@ void delete_mempool(struct mempool *mp) __attribute__ ((nonnull));
 /* -------------------- DATA STRUCTURES -------------------- */
 #ifdef ENABLE_DATASTRUCTS
 
+#include <stddef.h>
 /* ISO C forbids zero-size array ‘data’ */
 #define __ARRAY_SIZEOF_DATA_ELEM	1
 #ifdef C89
@@ -482,14 +483,6 @@ struct __array_data__ {
 	byte data[__ARRAY_SIZEOF_DATA_ELEM];
 };
 
-/*ISO C forbids zero-size array ‘data’ */
-#define __ARRAY_SIZEOF_DATA__	1
-
-typedef struct {
-	size_t size, nmemb;
-	byte data[__ARRAY_SIZEOF_DATA__];
-} __array_data__;
-
 typedef struct __datastruct_elem__ {
 	void *data;
 	struct __datastruct_elem__ *next;
@@ -500,7 +493,7 @@ typedef struct __datastruct__ {
 } __datastruct__;
 
 /* ----- Array ----- */
-typedef __array_data__* Array;
+typedef struct __array_data__* Array;
 
 /* WARNING: size refers to the size of a single element in the array, NOT to the size
  * of the array itself */
@@ -510,7 +503,9 @@ Array array_clone(Array a, void *(*__clonefunc__)(void*));
 Array c_array_to_array(void *data, size_t size, size_t nmemb);
 
 void *array_append(Array a, void *elem);
+#define array_append(a, e)	array_append((a), (void*) (e))
 void *array_insert(Array a, void *elem, size_t index);
+#define array_insert(a, e, i)	array_append((a), (void*) (e), (i))
 Array array_filter(Array a, BOOL_TYPE (*__filterfunc__)(void*));
 void *array_map(Array a, void *(*__mapfunc__)(void *data, void *arg), void *arg);
 void array_sort(Array a, int (*__cmpfunc__)(void *e1, void *e2));
