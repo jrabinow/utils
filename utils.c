@@ -898,6 +898,77 @@ char* str_join(int str_array_size, char **str_array, char *separator)
 	strcpy(start, str_array[i]);
 	return str;
 }
+
+#define STRINGBUFFER_SIZE	8
+StringBuffer append_to_stringbuffer(StringBuffer sb, char *str)
+{
+	size_t len;
+
+	if(unlikely(sb == (StringBuffer) NULL)) {
+#ifdef INTERNAL_ERROR_HANDLING
+		sb = (StringBuffer) xmalloc(sizeof(struct StringBuff));
+		sb->data = (char**) xmalloc(STRINGBUFFER_SIZE * sizeof(char*));
+#else
+		sb = (StringBuffer) malloc(sizeof(struct StringBuff));
+		if(unlikely(sb == (char*) NULL))
+			return (char*) NULL;
+		sb->data = (char**) xmalloc(STRINGBUFFER_SIZE * sizeof(char*));
+		if(unlikely(sb->data == (char*) NULL))
+			return (char*) NULL;
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
+		sb->size = 0;
+		sb->len = 1;
+	}
+	if(likely(str != (char*) NULL)) {
+		len = strlen(str);
+		if((sb->size & (sb->size - 1)) == 0 && sb->size >= STRINGBUFFER_SIZE) {
+#ifdef INTERNAL_ERROR_HANDLING
+			sb->data = (char**) xrealloc(sb->data, (sb->size << 1) * sizeof(char*));
+#else
+			sb->data = (char**) realloc(sb->data, (sb->size << 1) * sizeof(char*));
+			if(unlikely(sb->data == (char*) NULL))
+				return (char*) NULL;
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
+		}
+#ifdef INTERNAL_ERROR_HANDLING
+		sb->data[sb->size] = (char*) xmalloc((len + 1) * sizeof(char));
+#else
+		sb->data[sb->size] = (char*) malloc((len + 1) * sizeof(char));
+		if(unlikely(sb->data[sb->size] == (char*) NULL))
+			return (char*) NULL;
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
+		memcpy(sb->data[sb->size], str, len + 1);
+		sb->size++;
+		sb->len += len;
+	}
+	return sb;
+}
+
+char *stringbuffer_to_string(StringBuffer sb)
+{
+	size_t i, len;
+	char *str = (char*) NULL, *ptr;
+
+	if(sb != (StringBuffer) NULL) {
+#ifdef INTERNAL_ERROR_HANDLING
+		ptr = str = (char*) xmalloc(sb->len * sizeof(char));
+#else
+		ptr = str = (char*) malloc(sb->len * sizeof(char));
+		if(unlikely(str == (char*) NULL))
+			return (char*) NULL;
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
+		for(i = 0; i < sb->size; i++) {
+			len = strlen(sb->data[i]);
+			memcpy(ptr, sb->data[i], len + 1);
+			ptr += len;
+			free(sb->data[i]);
+		}
+		*ptr = '\0';
+		free(sb->data);
+		free(sb);
+	}
+	return str;
+}
 #endif /* ifdef ENABLE_STRING_MANIPULATION */
 
 /*void delete_stringbuffer(StringBuffer sb)
@@ -1129,7 +1200,7 @@ Array c_array_to_array(void *data, size_t size, size_t nmemb)
 	if(likely(a != (Array) NULL)) {
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
 		a->size = size;
-		a->nmemb = incr;
+		a->nmemb = nmemb;
 		memcpy(a->data, data, size * nmemb);
 #ifndef INTERNAL_ERROR_HANDLING
 	}
@@ -1137,7 +1208,7 @@ Array c_array_to_array(void *data, size_t size, size_t nmemb)
 	return a;
 }
 
-Array clone_array(Array a, void *(*__clonefunc__)(void*))
+Array array_clone(Array a, void *(*__clonefunc__)(void*))
 {
 	Array a_copy = (Array) NULL;
 	size_t incr, numbytes = a->size * a->nmemb;
@@ -1156,7 +1227,7 @@ Array clone_array(Array a, void *(*__clonefunc__)(void*))
 	a_copy = (Array) malloc(__SIZEOF_ARRAY_STRUCT + incr * a->size);
 	if(likely(a_copy != (Array) NULL)) {
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
-		if(__clonefunc__ == (void *(*)(void*)) NULL)
+		if(__clonefunc__ != (void *(*)(void*)) NULL)
 			for(incr = 0; incr < numbytes; incr += a->size)
 				*(void**) (a_copy->data + incr) = __clonefunc__(a->data + incr);
 		else
@@ -1171,20 +1242,20 @@ Array clone_array(Array a, void *(*__clonefunc__)(void*))
 }
 
 #undef array_append
-void *array_append(Array a, void *elem)
+void *array_append(Array *a, void *elem)
 {
-	if(unlikely(a->nmemb >= __ARRAY_START_NMEMB && (a->nmemb & (a->nmemb - 1)) == 0))
+	if(unlikely((*a)->nmemb >= __ARRAY_START_NMEMB && ((*a)->nmemb & ((*a)->nmemb - 1)) == 0))
 #ifdef INTERNAL_ERROR_HANDLING
 	{
-		a = (Array) xrealloc(a, __SIZEOF_ARRAY_STRUCT + a->size * (a->nmemb << 1));
+		*a = (Array) xrealloc(*a, __SIZEOF_ARRAY_STRUCT + (*a)->size * ((*a)->nmemb << 1));
 	}
 #else
 	{
-		a = (Array) realloc(a, __SIZEOF_ARRAY_STRUCT + a->size * (a->nmemb << 1));
+		*a = (Array) realloc(*a, __SIZEOF_ARRAY_STRUCT + (*a)->size * ((*a)->nmemb << 1));
 	}
-	if(likely(a != (Array) NULL))
+	if(likely(*a != (Array) NULL))
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
-		memcpy(a->data + a->size * a->nmemb++, elem, a->size);
+		memcpy((*a)->data + (*a)->size * (*a)->nmemb++, elem, (*a)->size);
 #ifndef INTERNAL_ERROR_HANDLING
 	else
 		return (void*) NULL;
@@ -1193,11 +1264,11 @@ void *array_append(Array a, void *elem)
 }
 
 #undef array_insert
-void *array_insert(Array a, void *elem, size_t index)
+void *array_insert(Array *a, void *elem, size_t index)
 {
 	size_t incr;
 
-	if(index > a->nmemb) {
+	if(index > (*a)->nmemb) {
 		incr = index + (index == 0) - 1;
 		incr |= incr >> 1;
 		incr |= incr >> 2;
@@ -1207,21 +1278,21 @@ void *array_insert(Array a, void *elem, size_t index)
 		incr |= incr >> 32;
 		incr++;
 #ifdef INTERNAL_ERROR_HANDLING
-		a = (void*) xrealloc(a, __SIZEOF_ARRAY_STRUCT + incr * a->size);
+		*a = (Array) xrealloc(*a, __SIZEOF_ARRAY_STRUCT + (incr + 1) * (*a)->size);
 #else
-		a = (void*) realloc(a, __SIZEOF_ARRAY_STRUCT + incr * a->size);
-		if(unlikely(a) == (void*) NULL)
+		*a = (Array) realloc(*a, __SIZEOF_ARRAY_STRUCT + (incr + 1) * (*a)->size);
+		if(unlikely(*a == (void*) NULL))
 			return (void*) NULL;
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
 	}
-	memcpy(a->data + a->size * index, elem, a->size);
+	memcpy((*a)->data + (*a)->size * index, elem, (*a)->size);
 
 	return elem;
 }
-
+#if 0
 Array array_filter(Array a, BOOL_TYPE (*__filterfunc__)(void*))
 {
-	size_t incr, j, numbytes = a->size * a->nmemb;
+	size_t incr, numbytes = a->size * a->nmemb;
 	Array filtered = (Array) NULL;
 
 	incr = a->nmemb + (a->nmemb == 0) - 1;
@@ -1240,9 +1311,11 @@ Array array_filter(Array a, BOOL_TYPE (*__filterfunc__)(void*))
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
 		filtered->size = a->size;
 		filtered->nmemb = 0;
-		for(incr = 0, j = 0; incr < numbytes; incr += a->size, j += a->size)
-			if(__filterfunc__(*(void**) (a->data + a->size * j)))
-				memcpy(filtered->data + filtered->size * incr, a->data + a->size * j, a->size);
+		for(incr = 0; incr < numbytes; incr += a->size) {
+			printf("%zu %d\n", incr, a->_int[incr >> 2]);
+			if(__filterfunc__(*(void**) (a->data + a->size * incr)))
+				memcpy(filtered->data + filtered->size * incr, a->data + a->size * incr, a->size);
+		}
 #ifndef INTERNAL_ERROR_HANDLING
 	}
 #endif /* #ifndef INTERNAL_ERROR_HANDLING */
@@ -1265,6 +1338,35 @@ void array_sort(Array a, int (*cmpfunc)(void *e1, void *e2))
 {
 	qsort(a->data, a->nmemb, a->size, (__compar_fn_t) cmpfunc);
 }
+
+void ***new_array_dim2(size_t dim1, size_t dim2, size_t size)
+{
+	size_t i;
+	void ***arr = (void***) NULL;
+
+#ifdef INTERNAL_ERROR_HANDLING
+	arr = xmalloc(dim1 * sizeof(void**));
+	arr[0] = xmalloc(dim1 * dim2 * size);
+#else
+	arr = malloc(dim1 * sizeof(void**));
+	if(arr != (void***) NULL)
+		arr[0] = malloc(dim1 * dim2 * size);
+	if(arr != (void***) NULL && arr[0] != (void**) NULL) {
+#endif
+		for(i = 1; i < dim1; i++)
+			arr[i] = arr[i - 1] + dim2 * size;
+#ifndef INTERNAL_ERROR_HANDLING
+	}
+#endif
+	return arr;
+}
+
+void delete_array_dim2(void ***array)
+{
+	free(array[0]);
+	free(array);
+}
+#endif /* #if 0 */
 
 /* ----- Double-linked list ----- */
 DLinkedList new_dlinkedlist(void)
@@ -2232,16 +2334,16 @@ Mmap *mopen(const char *path, const char *mode)
 	}
 #endif /* #if (! defined(__linux__)) || (! defined(_GNU_SOURCE)) */
 	if(unlikely((offset = lseek(i, 0, SEEK_END)) == -1)) {
-		perror("Error obtaining file size");
+		log_message(LOG_ERROR, "Error obtaining file size: %s", strerror(errno));
 		exit(EXIT_FAILURE);
 	}
 	if(unlikely(lseek(i, 0, SEEK_SET) == -1)) {
-		perror("Error obtaining file size");
+		log_message(LOG_ERROR, "Error obtaining file size: %s", strerror(errno));
 		exit(EXIT_FAILURE);
 	}
 	if(unlikely((f->ptr = (byte*) mmap(NULL, offset,
 						prot, flags, i, (off_t) 0)) == MAP_FAILED)) {
-		perror("Error loading file into memory");
+		log_message(LOG_ERROR, "Error loading file into memory: %s", strerror(errno));
 		exit(EXIT_FAILURE);
 	}
 #else
@@ -2678,15 +2780,65 @@ void register_signal_handler(int signum, void (*sighandler)(int))
 	}
 }
 
+#ifdef __unix__
+static struct timespec start = { 0, 0 };
+
+void benchmark_start(void)
+{
+	if(unlikely(clock_gettime(CLOCK_MONOTONIC_RAW, &start) != 0)) {
+		log_message(LOG_ERROR, "Error calling clock_gettime(): %s", strerror(errno));
+#ifdef INTERNAL_ERROR_HANDLING
+		exit(0);
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
+	}
+}
+
+void benchmark_end(struct timespec *ret)
+{
+	struct timespec end = { 0, 0 };
+	time_t carry;
+
+	if(unlikely(clock_gettime(CLOCK_MONOTONIC_RAW, &end) != 0)) {
+		log_message(LOG_ERROR, "Error calling clock_gettime(): %s", strerror(errno));
+#ifdef INTERNAL_ERROR_HANDLING
+		exit(0);
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
+	}
+
+	ret->tv_nsec = end.tv_nsec - start.tv_nsec;
+	carry = (ret->tv_nsec >> ((sizeof(long) << 3) - 1)) & 0x01;
+	ret->tv_sec = end.tv_sec - start.tv_sec - carry;
+	ret->tv_nsec = carry * 1000000000L + ret->tv_nsec;
+}
+
+#endif /* #ifdef __unix__ */
+
 /* From
 http://www.emoticode.net/c/an-example-log-function-using-different-log-levels-and-variadic-macros.html */
 static log_level_t __g_loglevel = LOG_DEBUG;
 static FILE *__g_loghandle = (FILE*) NULL;
 
-void init_log(FILE *stream, log_level_t loglevel)
+static void close_log_stream(int status, void *arg)
 {
+	FILE *stream = (FILE*) arg;
+
+	(void) status;
+	fclose(stream);
+}
+
+int init_log(FILE *stream, log_level_t loglevel)
+{
+	int ret = 0;
+
 	__g_loglevel = loglevel;
 	__g_loghandle = stream;
+	if(unlikely((ret = on_exit(&close_log_stream, __g_loghandle)) != 0)) {
+		log_message(LOG_ERROR, "Error registering on_exit() function: %s", strerror(errno));
+#ifdef INTERNAL_ERROR_HANDLING
+		exit(EXIT_FAILURE);
+#endif /* #ifdef INTERNAL_ERROR_HANDLING */
+	}
+	return ret;
 }
 
 void va_log_message(log_level_t level, const char *fmt, va_list ap)

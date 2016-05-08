@@ -60,7 +60,7 @@
 #define ENABLE_TERMIOS_MANIPULATION
 
 /* Threading functions. Still very basic */
-#define ENABLE_THREADING
+/* #define ENABLE_THREADING */
 
 /* Memory pool, to cache heap memory and avoid having to call malloc. Idea is that
  * we often ask for same memory sizes (nodes in a linked list or tree, data structures
@@ -389,6 +389,20 @@ char *str_join(int str_array_size, char **str_array, char *separator) __attribut
 /* Cancel construction of string buffer without assembling final string */
 /* void delete_stringbuffer(StringBuffer sb); */
 
+
+struct StringBuff {
+	size_t len, size;
+	char **data;
+};
+
+typedef struct StringBuff *StringBuffer;
+
+/* Add str to string buffer. If sb is NULL, it will be automatically allocated */
+StringBuffer append_to_stringbuffer(StringBuffer sb, char *str);
+
+/* Convert from string buffer to string. Free return value when done */
+char *stringbuffer_to_string(StringBuffer sb);
+
 /* returns true if str1 and str2 are 2 the same strings. Helps make code more readable */
 #define str_equals(str1, str2)	(strcmp(str1, str2) == 0)
 
@@ -480,7 +494,23 @@ void delete_mempool(struct mempool *mp) __attribute__ ((nonnull));
  * redefining struct __array_data__ */
 struct __array_data__ {
 	size_t size, nmemb;
-	byte data[__ARRAY_SIZEOF_DATA_ELEM];
+	union {
+		char _char[__ARRAY_SIZEOF_DATA_ELEM];
+		short _short[__ARRAY_SIZEOF_DATA_ELEM];
+		int _int[__ARRAY_SIZEOF_DATA_ELEM];
+		long _long[__ARRAY_SIZEOF_DATA_ELEM];
+		long long _llong[__ARRAY_SIZEOF_DATA_ELEM];
+		float _float[__ARRAY_SIZEOF_DATA_ELEM];
+		double _double[__ARRAY_SIZEOF_DATA_ELEM];
+		long double _ldouble[__ARRAY_SIZEOF_DATA_ELEM];
+		unsigned char _uchar[__ARRAY_SIZEOF_DATA_ELEM];
+		unsigned short _ushort[__ARRAY_SIZEOF_DATA_ELEM];
+		unsigned int _uint[__ARRAY_SIZEOF_DATA_ELEM];
+		unsigned long _ulong[__ARRAY_SIZEOF_DATA_ELEM];
+		unsigned long long _ullong[__ARRAY_SIZEOF_DATA_ELEM];
+		void *ptr[__ARRAY_SIZEOF_DATA_ELEM];
+		byte data[__ARRAY_SIZEOF_DATA_ELEM];
+	};
 };
 
 typedef struct __datastruct_elem__ {
@@ -502,10 +532,10 @@ Array new_array(size_t size);
 Array array_clone(Array a, void *(*__clonefunc__)(void*));
 Array c_array_to_array(void *data, size_t size, size_t nmemb);
 
-void *array_append(Array a, void *elem);
-#define array_append(a, e)	array_append((a), (void*) (e))
-void *array_insert(Array a, void *elem, size_t index);
-#define array_insert(a, e, i)	array_append((a), (void*) (e), (i))
+void *array_append(Array *a, void *elem);
+#define array_append(a, e)	array_append((&a), (void*) (e))
+void *array_insert(Array *a, void *elem, size_t index);
+#define array_insert(a, e, i)	array_insert((&a), (void*) (e), (i))
 Array array_filter(Array a, BOOL_TYPE (*__filterfunc__)(void*));
 void *array_map(Array a, void *(*__mapfunc__)(void *data, void *arg), void *arg);
 void array_sort(Array a, int (*__cmpfunc__)(void *e1, void *e2));
@@ -819,6 +849,9 @@ void *initialize_vector(void *dest, const void *src, size_t size, size_t nmemb) 
 /* register sighandler as the signal handler function to be called when program receives
  * signal signum. As usual, signals SIGKILL and SIGSTOP cannot be ignored or intercepted */
 void register_signal_handler(int signum, void (*sighandler)(int));
+
+void benchmark_start(void);
+void benchmark_end(struct timespec *ret);
 #endif /* #ifdef __unix__ */
 
 typedef enum {
@@ -829,9 +862,13 @@ typedef enum {
 	LOG_FATAL
 } log_level_t;
 
-/* Initialize log system on file stream. Logs by default on stderr. To completely
- * disable logging, call init_log with stream parameter set to NULL */
-void init_log(FILE *stream, log_level_t loglevel) __attribute__ ((nonnull));
+/* Initialize log system on file stream. Logs by default on stderr.
+ * Do not close the stream yourself.
+ * To completely disable logging, call init_log with stream parameter set to NULL
+ * The logging system will close the stream automatically on exit by attempting
+ * to register an exit handler.
+ * If no error occured, init_log() returns 0, otherwise it returns non-0 */
+int init_log(FILE *stream, log_level_t loglevel);
 /* logs a message following printf conventions */
 void log_message(log_level_t level, const char *format, ... ) __attribute__ ((nonnull (2)));
 
