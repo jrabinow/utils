@@ -4,6 +4,7 @@
 CC=gcc
 CFLAGS=-Wall -Wextra -march=native
 LDFLAGS=-s -lpthread
+OS:= $(shell uname)
 
 ifeq ($(CC), gcc)
 	GCCVERSION := $(shell $(CC) -dumpversion|cut -d. -f1,2)
@@ -26,13 +27,25 @@ ifeq ($(OS), SunOS)
 	LDFLAGS += -lsocket -lnsl
 endif
 
-all: utils.h utils.o
+ifdef MAIN
+all: utils.o $(addsuffix .o, $(MAIN))
+	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $(MAIN)
+endif
+utils.o:
 
 ansi: CFLAGS += -ansi
+ifdef MAIN
 ansi: all
+else
+ansi: utils.o
+endif
 
 debug: CFLAGS += -Og -g -ggdb -DDEBUG
+ifdef MAIN
 debug: all
+else
+debug: utils.o
+endif
 
 clean:
 	$(RM) a.out $(wildcard *.o)
