@@ -2496,7 +2496,7 @@ void failwith(const char *errmsg, ...)
 	va_list ap;
 
 	va_start(ap, errmsg);
-	log_message(LOG_FATAL, errmsg);
+	va_log_message(LOG_FATAL, errmsg, ap);
 	va_end(ap);
 
 	exit(EXIT_FAILURE);

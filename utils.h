@@ -18,8 +18,13 @@
 #ifndef UTILS_H
 #define UTILS_H
 
-/* Read through this file to find out precisely what is enabled by the
- * following #defines */
+/*
+ * READ THROUGH THIS FILE TO FIND OUT PRECISELY WHAT IS ENABLED BY THE
+ * FOLLOWING #defineS
+ */
+
+
+
 
 /* define bool variable type. I recommend taking Torvalds advice and not using
  * this feature:
@@ -51,7 +56,7 @@
 #define ENABLE_NETWORKING
 
 /* Terminal manipulation functions, as well as color text printing
- * Will not work with compatible terminals and terminal emulators */
+ * Will only work with compatible terminals and terminal emulators */
 #define ENABLE_TERMIOS_MANIPULATION
 
 /* Threading functions. Still very basic */
@@ -200,6 +205,7 @@ void xfree(void *ptr);
 
 /* exit program with failed status if malloc and consorts fail
  * -> no more error checking necessary
+ * Calls exit() at failure
  * free() when done */
 void *xmalloc(size_t size) __attribute__ ((malloc));
 void *xcalloc(size_t nmemb, size_t size) __attribute__ ((malloc));
@@ -207,7 +213,7 @@ char *xstrdup(const char *str);
 void *xrealloc(void *ptr, size_t size);
 
 #define MAX_RETRIES_OPEN	3
-/* attempt to open file file in mode mode. Calls exit() at failure */
+/* attempt to open the file with the corresponding mode. Calls exit() at failure */
 FILE *xfopen(const char *file, const char *mode) __attribute__ ((nonnull));
 /* attempt to create a stream opened in mode mode from file descriptor fd.
  * Calls exit() at failure */
@@ -350,7 +356,7 @@ const char *rev_strcspn(const char *str, const char *accept) __attribute__ ((non
 char *neg_strchr(const char *s, int c) __attribute__ ((nonnull))
 				       __attribute__ ((pure));
 
-/* separates str along separator chars into non-empty tokens. If str is composed only
+/* Splits str along separator chars into non-empty tokens. If str is composed only
  * of separator chars, return_array will point to NULL.
  * Otherwise, return_array will point to dynamically allocated array with one string token
  * per array element.
@@ -446,7 +452,7 @@ void delete_mempool(struct mempool *mp) __attribute__ ((nonnull));
 /* -------------------- DATA STRUCTURES -------------------- */
 #ifdef ENABLE_DATASTRUCTS
 
-/*ISO C forbids zero-size array ‘data’ */
+/* ISO C forbids zero-size array ‘data’ */
 #define __ARRAY_SIZEOF_DATA_ELEM	1
 #ifdef C89
 # define __SIZEOF_ARRAY_STRUCT	(offsetof(struct __array_data__, data))
@@ -506,7 +512,7 @@ void *stack_pop(Stack *s);
 void *stack_peek(Stack s);
 
 /* for a consistent interface */
-#define stack_push(s, __del__)	stack_push(&(s), (__del__))
+#define stack_push(s, data)	stack_push(&(s), (data))
 #define stack_pop(s)		stack_pop(&(s))
 
 /* ----- Queue ----- */
@@ -705,7 +711,7 @@ typedef struct {
 /* Map file to memory space. Mode can contain any of the characters 'r', 'w' or 'x'
  * in any order, or none of "rwx" for PROT_NONE (see mmap(2) for details)
  * Mode can also contain 's' or 'p' for shared or private memory mapping. Only
- * the last 's' or 'p' in the string will take effect. Address space is mapped
+ * the last 's' or 'p' in the string will have an effect. Address space is mapped
  * private by default */
 Mmap *mopen(const char *path, const char *mode) __attribute__ ((nonnull));
 
