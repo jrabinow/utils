@@ -129,7 +129,7 @@
 
 /* fix KERNEL_VERSION() macro preprocessing errors */
 #ifndef __linux__
-# define KERNEL_VERSION(x, y, z)	0
+# define KERNEL_VERSION(x, y, z)	(1 << 30)
 #endif /* #ifndef __linux__ */
 
 #include <stdio.h>
@@ -220,6 +220,12 @@ FILE *xfopen(const char *file, const char *mode) __attribute__ ((nonnull));
 FILE *xfdopen(int fd, const char *mode) __attribute__ ((nonnull));
 
 #ifdef __unix__
+
+/* a horrid kludge trying to make sure that this will fail on old kernels */
+#ifndef O_TMPFILE
+# define O_TMPFILE (__O_TMPFILE | O_DIRECTORY)
+#endif /* #ifndef O_TMPFILE */
+
 int xopen(const char *path, int flags, ...) __attribute__ ((nonnull));
 /* attempts to create a pipe. Calls exit() at failure */
 #define xpipe(pipefd)\
@@ -356,6 +362,10 @@ const char *rev_strcspn(const char *str, const char *accept) __attribute__ ((non
 char *neg_strchr(const char *s, int c) __attribute__ ((nonnull))
 				       __attribute__ ((pure));
 
+/* Count occurences of character c in string s */
+unsigned count_characters(const char *s, char c) __attribute__ ((nonnull))
+						 __attribute__ ((pure));
+
 /* Splits str along separator chars into non-empty tokens. If str is composed only
  * of separator chars, return_array will point to NULL.
  * Otherwise, return_array will point to dynamically allocated array with one string token
@@ -377,6 +387,9 @@ size_t split_str_lite(char *str, char separator, char ***return_array) __attribu
  * in between each string
  * returns the resulting dynamically allocated string. free() when done */
 char *str_join(int str_array_size, char **str_array, char *separator) __attribute__ ((nonnull));
+
+/* Cancel construction of string buffer without assembling final string */
+/* void delete_stringbuffer(StringBuffer sb); */
 
 /* returns true if str1 and str2 are 2 the same strings. Helps make code more readable */
 #define str_equals(str1, str2)	(strcmp(str1, str2) == 0)
@@ -409,7 +422,10 @@ int getc_unlocked(FILE *stream) __attribute__ ((nonnull));
  * free() buffer when done */
 #include <ctype.h>
 #include <unistd.h>
-char *read_file_descriptor(int fd);
+char *read_fd_str(int fd);
+char *read_file_str(const char *path);
+byte *read_file_descriptor(int fd, ssize_t *n);
+byte *read_file(const char *path, ssize_t *n);
 #endif /* #ifdef __unix__ */
 
 /* Empties buffer till nothing left to read or hits end of line. Useful with scanf/fscanf */
@@ -648,7 +664,7 @@ void set_style(Color c, Color bgc, Style s);
 /* print a string fmt with font color c, background color bgc and style s
  * restores previous state of terminal after printing fmt
  * WARNING: THIS FUNCTION IS NOT THREAD-SAFE !!! */
-void stylish_printf(Color c, Color bgc, Style s, const char *fmt, ...) __attribute__ ((nonnull (4)));
+void stylish_fprintf(FILE *stream, Color c, Color bgc, Style s, const char *fmt, ...) __attribute__ ((nonnull (1, 5)));
 
 /* reset everything to default */
 #define reset_style(stream)		fprintf(stream, "\x1B[0m")
@@ -715,18 +731,18 @@ typedef struct {
  * private by default */
 Mmap *mopen(const char *path, const char *mode) __attribute__ ((nonnull));
 
-size_t mread(void *ptr, size_t size, size_t nmemb, Mmap *f) __attribute__ ((nonnull));
-size_t mwrite(void *ptr, size_t size, size_t nmemb, Mmap *f) __attribute__ ((nonnull));
+size_t mread(void *ptr, size_t size, size_t nmemb, Mmap *f) __attribute__ ((nonnull (1)));
+size_t mwrite(void *ptr, size_t size, size_t nmemb, Mmap *f) __attribute__ ((nonnull (1)));
 
-int mgetc(Mmap *f) __attribute__ ((nonnull));
+int mgetc(Mmap *f);
 
-char *mgets(char *s, int size, Mmap *f) __attribute__ ((nonnull));
+char *mgets(char *s, int size, Mmap *f) __attribute__ ((nonnull (1)));
 /* In its current implementation, this function can cause buffer overflows. Use mnprintf instead for the time being */
 /*int mprintf(Mmap *f, const char *fmt, ...); */
-int mnprintf(Mmap *f, size_t size, const char *fmt, ...) __attribute__ ((nonnull (1,3)));
+int mnprintf(Mmap *f, size_t size, const char *fmt, ...) __attribute__ ((nonnull (3)));
 
 /* Unmap and close resources */
-int mclose(Mmap *f) __attribute__ ((nonnull));
+int mclose(Mmap *f);
 
 #endif /* #if defined(ENABLE_MMAP) && defined(__unix__) */
 
