@@ -345,6 +345,7 @@ int xopen(const char *path, int flags, ...)
 #if defined(_GNU_SOURCE) && defined(__linux__)
 			case EINVAL:
 				flags &= ~O_DIRECT;
+				break;
 #endif /* #if defined(_GNU_SOURCE) && defined(__linux__) */
 			case EINTR:
 				log_message(LOG_ERROR, "Error opening file: %s\nRetrying", strerror(errno));
@@ -508,14 +509,16 @@ char *const_append(const char *str, ...)
 #undef append
 char *append(char *str, ...)
 {
-	char *ptr = (char*) NULL, *new_str = str;
+	char *ptr = (char*) NULL, *new_str;
 	va_list ap;
-	size_t orig_len, len = strlen(new_str);
+	size_t orig_len, len = 0;
 
+	new_str = str;
+	len = new_str == (char*) NULL ? 0 : strlen(new_str);
 	orig_len = len;
 	va_start(ap, str);
 #if defined(MANAGE_MEM) && defined(C99)
-	if( ! is_allocated(str1))
+	if( ! is_allocated(str))
 		return va_const_append(str, ap);
 #endif /* #if defined(MANAGE_MEM) && defined(C99) */
 	while((ptr = va_arg(ap, char*)) != (char*) NULL)
@@ -729,6 +732,15 @@ char *neg_strchr(const char *s, int c)
 	return (char*) (*s == '\0' ? NULL : s);
 }
 
+unsigned count_characters(const char *str, char c)
+{
+	unsigned count;
+
+	for(count = 0; *str != '\0'; count += *str++ == c)
+		;
+	return count;
+}
+
 /* return_array is set to NULL if all chars in str are separator
  * return_array and all elements in return_array are dynamically allocated -> free them all when done */
 size_t split_str(const char *str, char separator, char ***return_array)
@@ -882,6 +894,15 @@ char* str_join(int str_array_size, char **str_array, char *separator)
 }
 #endif /* ifdef ENABLE_STRING_MANIPULATION */
 
+/*void delete_stringbuffer(StringBuffer sb)
+{
+	size_t i;
+
+	for(i = 0; i < sb->size; i++)
+		free(sb->data[i]);
+	free(sb->data);
+	free(sb);
+} */
 
 /* -------------------- Reading data -------------------- */
 #ifdef ENABLE_READ_DATA
@@ -899,12 +920,17 @@ char *read_line(FILE *stream)
 		return (char*) NULL;
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
 
-#ifdef _POSIX_THREAD_SAFE_FUNCTIONS	/* locking and getc_unlocked functions */
+#if defined(_POSIX_THREAD_SAFE_FUNCTIONS) && (_POSIX_C_SOURCE >= 1 || \
+		defined(_XOPEN_SOURCE) || defined(POSIX_SOURCE) || \
+		defined(_BSD_SOURCE) || defined(_SVID_SOURCE))
+	/* locking and getc_unlocked functions */
 	flockfile(stream);
 	while((c = getc_unlocked(stream)) != EOF && c != '\n')
 #else
 		while((c = getc(stream)) != EOF && c != '\n')
-#endif /* #ifdef _POSIX_THREAD_SAFE_FUNCTIONS */
+#endif /* #if defined(_POSIX_THREAD_SAFE_FUNCTIONS) && (_POSIX_C_SOURCE >= 1 || \
+	  defined(_XOPEN_SOURCE) || defined(POSIX_SOURCE) || \
+	  defined(_BSD_SOURCE) || defined(_SVID_SOURCE)) */
 		{
 			if(i == current_size) {
 #ifdef INTERNAL_ERROR_HANDLING
@@ -917,9 +943,13 @@ char *read_line(FILE *stream)
 			}
 			str[i++] = c;
 		}
-#ifdef _POSIX_THREAD_SAFE_FUNCTIONS
+#if defined(_POSIX_THREAD_SAFE_FUNCTIONS) && (_POSIX_C_SOURCE >= 1 || \
+		defined(_XOPEN_SOURCE) || defined(POSIX_SOURCE) || \
+		defined(_BSD_SOURCE) || defined(_SVID_SOURCE))
 	funlockfile(stream);
-#endif /* #ifdef _POSIX_THREAD_SAFE_FUNCTIONS */
+#endif /* #if defined(_POSIX_THREAD_SAFE_FUNCTIONS) && (_POSIX_C_SOURCE >= 1 || \
+	  defined(_XOPEN_SOURCE) || defined(POSIX_SOURCE) || \
+	  defined(_BSD_SOURCE) || defined(_SVID_SOURCE)) */
 	if(i == current_size) {
 #ifdef INTERNAL_ERROR_HANDLING
 		str = (char*) xrealloc(str, current_size += 1);
@@ -944,64 +974,81 @@ char *read_line(FILE *stream)
 	return str;
 }
 
-char *read_file_descriptor(int fd)
+char *read_fd_str(int fd)
+{
+	ssize_t n;
+	char *res = (char*) read_file_descriptor(fd, &n);
+	res[n] = '\0';
+	return res;
+}
+
+byte *read_file_descriptor(int fd, ssize_t *n)
 {
 	unsigned current_size = 32;
 	ssize_t i = 0, ret = 0;
 #ifdef INTERNAL_ERROR_HANDLING
-	char *str = (char*) xmalloc(current_size);
+	byte *mem = (byte*) xmalloc(current_size);
 #else
-	char *str = (char*) malloc(current_size);
-	if(unlikely(str == (char*) NULL))
-		return (char*) NULL;
+	byte *mem = (byte*) malloc(current_size);
+	if(unlikely(mem == (byte*) NULL))
+		return (byte*) NULL;
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
 
 	/* read (current_size - i) chars at a time, double current_size and increment
 	 * i by the number of characters read and repeat until no more characters
 	 * are available */
 	do {
-		ret = read(fd, str + i, current_size - i);
-		if(unlikely(ret < 0))
+		ret = read(fd, mem + i, current_size - i);
+		if(unlikely(ret <= 0))
 			break;
 		i += ret;
 		if(i == (ssize_t) current_size) {
 #ifdef INTERNAL_ERROR_HANDLING
-			str = xrealloc(str, current_size <<= 1);
+			mem = (byte*) xrealloc(mem, current_size <<= 1);
 #else
-			str = realloc(str, current_size <<= 1);
-			if(unlikely(str == (char*) NULL))
-				return (char*) NULL;
+			mem = (byte*) realloc(mem, current_size <<= 1);
+			if(unlikely(mem == (byte*) NULL))
+				return (byte*) NULL;
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
 		}
 	} while(i << 1 == (ssize_t) current_size);
 
 	if(ret == -1) {
-		free(str);
-		return (char*) NULL;
+		free(mem);
+		return (byte*) NULL;
 	} else {
 		/* allocate precisely as much memory (not a single byte more)
 		 * as is needed to contain the data */
 #ifdef INTERNAL_ERROR_HANDLING
 		if(i == (ssize_t) current_size)
-			str = (char*) xrealloc(str, current_size += 1);
+			mem = (byte*) xrealloc(mem, current_size += 1);
 		else
-			str = (char*) xrealloc(str, i + 1);
+			mem = (byte*) xrealloc(mem, i + 1);
 #else
 		if(i == (ssize_t) current_size)
-			str = (char*) realloc(str, current_size += 1);
+			mem = (byte*) realloc(mem, current_size += 1);
 		else
-			str = (char*) realloc(str, i + 1);
-		if(unlikely(str == (char*) NULL))
-			return (char*) NULL;
+			mem = (byte*) realloc(mem, i + 1);
+		if(unlikely(mem == (byte*) NULL))
+			return (byte*) NULL;
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
 	}
-	return str;
+	*n = i;
+	return mem;
 }
-#endif /* #ifdef ENABLE_READ_DATA */
 
-char *read_file(const char *path)
+char *read_file_str(const char *path)
 {
-	char *ptr;
+	ssize_t n;
+	char *res = (char*) read_file(path, &n);
+
+	res[n] = '\0';
+	return res;
+}
+
+byte *read_file(const char *path, ssize_t *n)
+{
+	byte *ptr;
 	int fd;
 
 #ifdef INTERNAL_ERROR_HANDLING
@@ -1018,19 +1065,20 @@ char *read_file(const char *path)
 #if defined(__linux__) && defined(_GNU_SOURCE)
 	fd = open(path, O_RDONLY | O_CLOEXEC);
 #else
-	fd = xopen(path, O_RDONLY);
+	fd = open(path, O_RDONLY);
 	if(fcntl(fd, F_SETFD, FD_CLOEXEC) != 0)
-		log_message(LOG_FATAL, "Failed setting FD_CLOEXEC flag on file descriptor: %s", strerror(errno));
+		log_message(LOG_ERROR, "Failed setting FD_CLOEXEC flag on file descriptor: %s", strerror(errno));
 #endif /* #if defined(__linux__) && defined(_GNU_SOURCE) */
 	if(unlikely(fd == -1))
-		return (char*) NULL;
+		return (byte*) NULL;
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
 
-	ptr = read_file_descriptor(fd);
+	ptr = read_file_descriptor(fd, n);
 	close(fd);
 
 	return ptr;
 }
+#endif /* #ifdef ENABLE_READ_DATA */
 
 
 
@@ -1513,10 +1561,9 @@ char *make_path(const char *path, ...)
 void *dirwalk(const char *path, BOOL_TYPE recurse, void *(*func)(char*, void*), void *arg)
 {
 	DIR *dir;
-	struct dirent *entry, *result;
+	struct dirent *entry;
 	char *new_path;
 	long namelen;
-	int ret;
 #ifdef _WIN32
 	namelen = MAX_PATH;
 #else
@@ -1530,7 +1577,7 @@ void *dirwalk(const char *path, BOOL_TYPE recurse, void *(*func)(char*, void*), 
 		entry = (struct dirent*) malloc(sizeof(struct dirent) + namelen);
 		if(entry != NULL) {
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
-			while((ret = readdir_r(dir, entry, &result)) == 0 && result != (struct dirent*) NULL)
+			while((entry = readdir(dir)) != (struct dirent*) NULL)
 				if(strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) {
 #ifdef C99
 					new_path = make_path(path, entry->d_name);
@@ -1555,7 +1602,7 @@ void *dirwalk(const char *path, BOOL_TYPE recurse, void *(*func)(char*, void*), 
 							arg = func(new_path, arg);
 					free(new_path);
 				}
-			if(ret != 0)
+			if(entry == (struct dirent*) NULL)
 				arg = (void*) NULL;
 #ifndef INTERNAL_ERROR_HANDLING
 		}
@@ -1684,18 +1731,18 @@ void set_style(Color c, Color bgc, Style s)
 	__color_session__.bgc = bgc;
 }
 
-void stylish_printf(Color c, Color bgc, Style s, const char *fmt, ...)
+void stylish_fprintf(FILE *stream, Color c, Color bgc, Style s, const char *fmt, ...)
 {
 	va_list ap;
 
 	va_start(ap, fmt);
-	printf("\x1B[%d;%dm", c + 30, s);
-	printf("\x1B[%dm", bgc + 40);
+	fprintf(stream, "\x1B[%d;%dm", c + 30, s);
+	fprintf(stream, "\x1B[%dm", bgc + 40);
 	vprintf(fmt, ap);
 	va_end(ap);
-	printf("\x1B[%dm", __color_session__.bgc);
-	printf("\x1B[%d;%dm", __color_session__.c + 30, __color_session__.s);
-	fflush(stdout);
+	fprintf(stream, "\x1B[%dm", __color_session__.bgc);
+	fprintf(stream, "\x1B[%d;%dm", __color_session__.c + 30, __color_session__.s);
+	fflush(stream);
 }
 
 int turn_echoing_off(void)
@@ -2413,6 +2460,45 @@ void *initialize_vector(void *dest, const void *src, size_t size, size_t nmemb)
 	return dest;
 }
 
+size_t human_readable(const char *str)
+{
+	size_t size = 0;
+	size_t len = strlen(str);
+	size_t mult = 1024;
+	char *endptr;
+
+	size = (size_t) strtoll(str, &endptr, 0);
+	if(size == 0 || (*endptr != '\0' && endptr != &str[len - 1])) {
+		fprintf(stderr, "Invalid size '%s'\n", str);
+		exit(EXIT_FAILURE);
+	}
+	switch(str[len - 1]) {
+		case 'T':
+			mult <<= 10;
+			__attribute__ ((fallthrough));
+		case 'G':
+			mult <<= 10;
+			__attribute__ ((fallthrough));
+		case 'M':
+			mult <<= 10;
+			__attribute__ ((fallthrough));
+		case 'K':
+		case 'k':
+			break;
+		case 'B':
+			mult = 1;
+			break;
+		default:
+			if(str[len - 1] < '0' || str[len - 1] > '9') {
+				fprintf(stderr, "Unknown suffix %c\n", str[len - 1]);
+				exit(EXIT_FAILURE);
+			}
+	}
+	size *= mult;
+
+	return size;
+}
+
 /* TODO: add possibility to modify sa_flags and sa_mask. See sigaction(2) for more info */
 void register_signal_handler(int signum, void (*sighandler)(int))
 {
@@ -2465,20 +2551,28 @@ void va_log_message(log_level_t level, const char *fmt, va_list ap)
 				break;
 			case LOG_INFO:
 				slevel = "INFO";
+#if defined(ENABLE_TERMIOS_MANIPULATION) && defined(__unix__)
 				bgcolor = GREEN;
+#endif	/* #if defined(ENABLE_TERMIOS_MANIPULATION) && defined(__unix__) */
 				break;
 			case LOG_WARNING:
 				slevel = "WARNING";
+#if defined(ENABLE_TERMIOS_MANIPULATION) && defined(__unix__)
 				bgcolor = BLUE;
+#endif	/* #if defined(ENABLE_TERMIOS_MANIPULATION) && defined(__unix__) */
 				break;
 			case LOG_ERROR:
 				slevel = "ERROR";
+#if defined(ENABLE_TERMIOS_MANIPULATION) && defined(__unix__)
 				bgcolor = YELLOW;
+#endif	/* #if defined(ENABLE_TERMIOS_MANIPULATION) && defined(__unix__) */
 				break;
 			case LOG_FATAL:
 			default:
 				slevel = "FATAL";
+#if defined(ENABLE_TERMIOS_MANIPULATION) && defined(__unix__)
 				bgcolor = RED;
+#endif	/* #if defined(ENABLE_TERMIOS_MANIPULATION) && defined(__unix__) */
 				break;
 		}
 #if defined(ENABLE_TERMIOS_MANIPULATION) && defined(__unix__)
