@@ -342,7 +342,10 @@ int xopen(const char *path, int flags, ...)
 				break;
 #if defined(_GNU_SOURCE) && defined(__linux__)
 			case EINVAL:
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
 				flags &= ~O_DIRECT;
+#pragma GCC diagnostic pop
 #endif /* #if defined(_GNU_SOURCE) && defined(__linux__) */
 			case EINTR:
 				log_message(LOG_ERROR, "Error opening file: %s\nRetrying", strerror(errno));
