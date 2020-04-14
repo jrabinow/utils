@@ -322,7 +322,11 @@ int xopen(const char *path, int flags, ...)
 #endif /* #if defined(__linux__) && LINUX_VERSION_CODE <= KERNEL_VERSION(3, 1, 0) */
 	{
 		va_start(ap, flags);
+#ifdef __APPLE__
+		mode = (mode_t) va_arg(ap, int);
+#else
 		mode = va_arg(ap, mode_t);
+#endif /* #ifdef __APPLE__ */
 		va_end(ap);
 	}
 	do {
