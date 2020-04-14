@@ -1516,54 +1516,36 @@ char *make_path(const char *path, ...)
 void *dirwalk(const char *path, BOOL_TYPE recurse, void *(*func)(char*, void*), void *arg)
 {
 	DIR *dir;
-	struct dirent *entry, *result;
+	struct dirent *entry;
 	char *new_path;
-	long namelen;
-	int ret;
-#ifdef _WIN32
-	namelen = MAX_PATH;
-#else
-	namelen = PATH_MAX;
-#endif /* #ifdef _WIN32 */
+
 	dir = opendir(path);
 	if(dir != (DIR*) NULL) {
-#ifdef INTERNAL_ERROR_HANDLING
-		entry = (struct dirent*) xmalloc(sizeof(struct dirent) + namelen);
-#else
-		entry = (struct dirent*) malloc(sizeof(struct dirent) + namelen);
-		if(entry != NULL) {
-#endif /* #ifdef INTERNAL_ERROR_HANDLING */
-			while((ret = readdir_r(dir, entry, &result)) == 0 && result != (struct dirent*) NULL)
-				if(strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) {
+        while((entry = readdir(dir)) != (struct dirent*) NULL)
+            if(strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) {
 #ifdef C99
-					new_path = make_path(path, entry->d_name);
+                new_path = make_path(path, entry->d_name);
 #else
-					new_path = make_path(path, entry->d_name, NULL);
+                new_path = make_path(path, entry->d_name, NULL);
 #endif /* #ifdef C99 */
 #ifndef INTERNAL_ERROR_HANDLING
-					if(unlikely(new_path == (char*) NULL)) {
-						closedir(dir);
-						return (void*) NULL;
-					}
+                if(unlikely(new_path == (char*) NULL)) {
+                    closedir(dir);
+                    return (void*) NULL;
+                }
 #endif /* #ifndef INTERNAL_ERROR_HANDLING */
 #ifdef _DIRENT_HAVE_D_TYPE
-					if(entry->d_type == DT_DIR)
+                if(entry->d_type == DT_DIR)
 #else
-						if(is_dir(new_path))
+                    if(is_dir(new_path))
 #endif /* #ifdef _WIN32 */
-						{
-							if(recurse)
-								dirwalk(new_path, recurse, func, arg);
-						} else
-							arg = func(new_path, arg);
-					free(new_path);
-				}
-			if(ret != 0)
-				arg = (void*) NULL;
-#ifndef INTERNAL_ERROR_HANDLING
-		}
-#endif /* #ifndef INTERNAL_ERROR_HANDLING */
-		free(entry);
+                    {
+                        if(recurse)
+                            dirwalk(new_path, recurse, func, arg);
+                    } else
+                        arg = func(new_path, arg);
+                free(new_path);
+            }
 		closedir(dir);
 	} else
 		arg = (void*) NULL;
