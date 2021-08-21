@@ -271,12 +271,10 @@ BOOL_TYPE endswith(const char *str, const char *suffix) __attribute__ ((nonnull)
 							__attribute__ ((pure));
 
 /* sets str to lower case */
-void str_tolower(char *str)  __attribute__ ((nonnull))
-			     __attribute__ ((pure));
+void str_tolower(char *str)  __attribute__ ((nonnull));
 
 /* sets str to upper case */
-void str_toupper(char *str)  __attribute__ ((nonnull))
-			     __attribute__ ((pure));
+void str_toupper(char *str)  __attribute__ ((nonnull));
 
 #if (! defined(__linux__)) && (! defined(BSD)) && (! defined(__MACH__))
 char *stpcpy(char *dest, const char *src) __attribute__ ((nonnull))
@@ -559,10 +557,10 @@ Bitset clone_bitset(const Bitset set);
 int getbit(const Bitset set, int pos) __attribute__ ((pure));
 
 /* set bit at position pos to 1 */
-void setbit(Bitset set, int pos) __attribute__ ((pure));
+void setbit(Bitset set, int pos);
 
 /* set bit at position pos to 0 */
-void unsetbit(Bitset set, int pos) __attribute__ ((pure));
+void unsetbit(Bitset set, int pos);
 
 /* flip bit at position pos */
 int togglebit(Bitset set, int pos) __attribute__ ((pure));
