@@ -2818,12 +2818,9 @@ http://www.emoticode.net/c/an-example-log-function-using-different-log-levels-an
 static log_level_t __g_loglevel = LOG_DEBUG;
 static FILE *__g_loghandle = (FILE*) NULL;
 
-static void close_log_stream(int status, void *arg)
+static void close_log_stream(void)
 {
-	FILE *stream = (FILE*) arg;
-
-	(void) status;
-	fclose(stream);
+	fclose(__g_loghandle);
 }
 
 int init_log(FILE *stream, log_level_t loglevel)
@@ -2832,8 +2829,8 @@ int init_log(FILE *stream, log_level_t loglevel)
 
 	__g_loglevel = loglevel;
 	__g_loghandle = stream;
-	if(unlikely((ret = on_exit(&close_log_stream, __g_loghandle)) != 0)) {
-		log_message(LOG_ERROR, "Error registering on_exit() function: %s", strerror(errno));
+	if(unlikely((ret = atexit(&close_log_stream)) != 0)) {
+		log_message(LOG_ERROR, "Error registering atexit() function: %s", strerror(errno));
 #ifdef INTERNAL_ERROR_HANDLING
 		exit(EXIT_FAILURE);
 #endif /* #ifdef INTERNAL_ERROR_HANDLING */
